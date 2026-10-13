@@ -52,11 +52,11 @@ window.va("beforeSend",function(e){if(e&&e.url)e.url=e.url.replace(/\/r\/[^?#]*/
 (function(){
   var btn=document.getElementById("play"),loading=false;
   window.VK_HOME=1;/* the standalone page: the game is the whole page, with its own HOW TO PLAY and INVITE buttons */
-  function play(after){
+  function play(){
     if(window.VKGame)return window.VKGame.open();
     if(loading)return;loading=true;
     var s=document.createElement("script");s.src="game.js?v=1";
-    s.onload=function(){loading=false;window.VKGame.open();if(after)after()};
+    s.onload=function(){loading=false;window.VKGame.open()};
     s.onerror=function(){loading=false;btn.textContent="TRY AGAIN";document.querySelector("main").hidden=false};/* the card only shows if the game could not load */
     document.head.appendChild(s);
   }

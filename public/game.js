@@ -6,7 +6,7 @@
 if(window.VKGame)return;
 
 /* ---------- look ---------- */
-const INK="#1d1d1d",PAPER="#F7F6F2",FLOOR="#EFEDE5",ENDWALL="#E9E6DD",SEAM="#E0DDD1",LINE="#CDC8B7",LAMP="#E4E1D6",DUST="#C4BCA6",RED="#E60000",MUTE="#75746B",WHITE="#FFFFFF";
+const INK="#1d1d1d",PAPER="#F7F6F2",LINE="#CDC8B7",DUST="#C4BCA6",RED="#E60000",MUTE="#75746B",WHITE="#FFFFFF";
 const PAL={k:INK,w:WHITE,s:"#EBC8A6",n:"#2E476B",y:"#E2C06A",G:"#E9E6DD",g:"#BDB8A6",r:RED,p:"#4972AC",l:"#DCD8CB",m:"#CBD1D6",M:"#9EA8B1",t:"#D9C9A3",T:"#B9A06F",b:"#B08A5A",B:"#6E5336",c:"#F3E3B0",d:"#7C8791",Y:"#B8923A",q:"#BFD0E6",
   e:"#6E9A6A",E:"#4F7A54",v:"#A9C59A",h:"#9B7653",H:"#6B4F38",o:"#C9CCC4",O:"#979E97",u:"#EAD8AF",a:"#C49A68",f:"#2F8F4E",i:"#B98D63",j:"#F4EFE3",z:"#F0388C",
   L:"#F7907F",V:"#A50E26",P:"#93B7E3",F:"#F39A2B",A:"#FFF0B0",N:"#8A4630",U:"#B66A42",C:"#E2EEF8",W:"#3C9A5A"};
@@ -31,7 +31,6 @@ const F={A:"010101111101101",B:"110101110101110",C:"011100100100011",D:"11010110
 
 /* ---------- sprites (drawn as text; outlines are added by code, a little wobbly) ---------- */
 /* the courier: white shirt, sleeves rolled, a red strap across his back to the bag at his hip; arms swing as he runs */
-const TOP=["....kkkk....","...kkkkkk...","..skkkkkks..","...kkkkkk...","....kkkk....",".....ss.....",".wwrwwwwwww.","w.wrrwwwww.w","w.wwrrwwww.w","s.wwwrrwww.s","s.wwwwrrrrrs","...dddddVyr.","...dddddrrr."];
 const RUN_A=["....kkkk....","...kkkkkk...","..skkkkkks..","...kkkkkk...","....kkkk....",".....ss.....",".wwrwwwwwww.","w.wrrwwwww.w","s.wwrrwwww.w","s.wwwrrwww.w","..wwwwrrrrrs","...dddddVyrs","...dddddrrr.","...dd..dd...","...kk..dd...",".......kk..."];
 const RUN_B=["....kkkk....","...kkkkkk...","..skkkkkks..","...kkkkkk...","....kkkk....",".....ss.....",".wwrwwwwwww.","w.wrrwwwww.w","w.wwrrwwww.s","w.wwwrrwww.s","s.wwwwrrrrr.","s..dddddVyr.","...dddddrrr.","...dd..dd...","...dd..kk...","...kk......."];
 const JUMP=["....kkkk....","...kkkkkk...","..skkkkkks..","...kkkkkk...","s...kkkk...s","w....ss....w","wwwrwwwwwwww","..wrrwwwww..","..wwrrwwww..","..wwwrrwww..","..wwwwrrrrr.","...dddddVyr.","...dddddrrr.","...dd..dd...","...kk..kk...","............"];
@@ -63,13 +62,12 @@ const RING=disc(37,d=>d>15.6&&d<=18.2?"M":".");
 const PU_MAG=[".yyyy.........","yy..yy........","y....yyyyyyyyy","yy..yy...y.y.y",".yyyy....y.y.."];
 const PU_BST=["pppppppppppppp","pwwwwwwwwwwwwp","pwrwwrwwkkkkwp","pwwrwwrwwwwwwp","pwrwwrwwkkkwwp","pwwwwwwwwwwwwp","pppppppppppppp"];
 const PU_SHR=["gggggggggggg","gGGGGGGGGGGg","gGGrrGGGGGGg","gGGGGGGGGGGg","gkkkkkkkkkkg",".w.w.w.w.w..",".w.w.w.w.w..",".w...w.w...."];
-const grid0=(w,h,f)=>{const r=[];for(let y=0;y<h;y++){let t="";for(let x=0;x<w;x++)t+=f(x,y)||".";r.push(t)}return r};
-const PU_VOX=grid0(11,11,(x,y)=>x<=7&&y>=3?((y===4&&x>=1&&x<=2)||(x===1&&y===5)?"w":"p"):y<3&&x>=3-y&&x<=10-y?"q":x>=8&&y>=11-x&&y<=18-x?"n":"");
+const grid=(w,h,f)=>{const r=[];for(let y=0;y<h;y++){let t="";for(let x=0;x<w;x++)t+=f(x,y)||".";r.push(t)}return r};
+const PU_VOX=grid(11,11,(x,y)=>x<=7&&y>=3?((y===4&&x>=1&&x<=2)||(x===1&&y===5)?"w":"p"):y<3&&x>=3-y&&x<=10-y?"q":x>=8&&y>=11-x&&y<=18-x?"n":"");
 const PU={mag:{name:"MASTER KEY",dur:9,sp:"pmag"},boost:{name:"FAST PASS",dur:4.5,sp:"pbst"},shield:{name:"SHREDDER",dur:0,sp:"pshr"},vox:{name:"OTHER SIDE",dur:20,sp:"pvox"}};
 
 /* ---------- obstacles: three kinds in every zone, each drawn for its place.
    dodge = tall, change lane   jump = low, hop over it   slide = hangs overhead, duck under it ---------- */
-const grid=(w,h,f)=>{const r=[];for(let y=0;y<h;y++){let s="";for(let x=0;x<w;x++)s+=f(x,y)||".";r.push(s)}return r};
 const BOOKS=[[[2,4,"r"],[1,3,"p"],[2,4,"W"],[1,4,"n"],[2,3,"t"],[1,4,"p"],[2,4,"r"],[1,3,"c"]],[[1,4,"n"],[2,4,"c"],[2,3,"r"],[1,4,"t"],[2,4,"p"],[1,3,"n"],[2,4,"c"],[1,4,"r"]],[[2,3,"t"],[1,4,"p"],[1,4,"r"],[2,4,"F"],[2,3,"n"],[1,4,"t"],[2,4,"p"],[1,3,"c"]],[[3,4,"T"],[3,4,"t"],[2,4,"c"],[2,3,"T"],[2,4,"t"]]];
 const OBS={
   /* Mailroom: pigeonhole sorting rack / mail cart / hanging mail sack */
@@ -83,11 +81,11 @@ const OBS={
   boxes:(()=>{const box=c=>["TTTTTTTT","tttkkttT","ttwww"+c+"tT","ttttttTT"],B=[[0,4,box("r")],[8,4,box("p")],[4,0,box("W")]];
     return grid(16,8,(x,y)=>{for(const[x0,y0,b]of B)if(x>=x0&&x<x0+8&&y>=y0&&y<y0+4)return b[y-y0][x-x0];return""})})(),
   files:grid(17,10,(x,y)=>{if(y===0)return"y";const i=(x-1)>>2,lx=(x-1)&3,c="rpWF"[i];if(x<1||x>15||lx===3)return"";
-    if(y===1)return lx===1?"k":"";if(y===2)return(i%2?lx>=1:lx<=1)?c:"";if(y===3)return(i%2?lx===0:lx===2)?"":"w";return y===9?"k".replace("k",c):y===5&&lx===1?"w":c}),
+    if(y===1)return lx===1?"k":"";if(y===2)return(i%2?lx>=1:lx<=1)?c:"";if(y===3)return(i%2?lx===0:lx===2)?"":"w";return y===5&&lx===1?"w":c}),
   /* Lobby: grandfather clock in mahogany, with a moon dial / velvet rope on brass posts / chandelier with lit candles */
   clock:grid(12,22,(x,y)=>{if(y===0)return x>=3&&x<=8?"N":"";if(y===1)return x>=2&&x<=9?(x===2||x===9?"N":"U"):"";
     if(y<=10){if(x<1||x>10)return"";if(x===1||x===10)return"N";
-      if(y===2)return x>=4&&x<=7?(x===4?"y":"n"):"U";if(y===3)return x>=3&&x<=8?(x===4||x===3&&0?"y":x===7?"w":"n"):"U";
+      if(y===2)return x>=4&&x<=7?(x===4?"y":"n"):"U";if(y===3)return x>=3&&x<=8?(x===4?"y":x===7?"w":"n"):"U";
       const d=Math.hypot(x-5.5,y-7.2);if(d<=3.7){if(d>2.8)return"y";if(x===5&&y>=5&&y<=7||y===7&&x>=6&&x<=7)return"k";return(x===5||x===6)&&y===4||x===3&&y===7?"M":"w"}return"U"}
     if(y<=12)return x>=3&&x<=8?(x===3||x===8?"N":"U"):"";
     if(y<=18){if(x<2||x>9)return"";if(x===2||x===9)return"N";if(x>=4&&x<=7&&y>=13&&y<=17){if(y>=15&&Math.hypot(x-5.5,y-16)<1.6)return y===15?"c":"y";return x===5||x===6?"Y":"B"}return"U"}
@@ -179,7 +177,7 @@ const VQ=[];function voxQueue(){if(VPREP)return;VPREP=true;for(let z=0;z<4;z++)f
 function voxStep(ms){const t=performance.now();while(VQ.length&&performance.now()-t<ms){VQ.shift()()}}
 function voxPrep(){voxQueue();voxStep(1e9)}
 const ZV=ZONES.map(Z=>{const o={};for(const k in Z)o[k]=typeof Z[k]==="string"&&Z[k][0]==="#"?hexc(mixc(rgb(Z[k]),TINT,k==="line"||k==="seam"?.3:k==="floor"?.2:.16)):Z[k];return o});
-const vbv=(z,v)=>{const a=BGV[z]||(BGV[z]=[]);return a[v]||(a[v]=hallway(v,ZV[z],true))},vbg=z=>[0,1,2].map(v=>vbv(z,v));
+const vbv=(z,v)=>{const a=BGV[z]||(BGV[z]=[]);return a[v]||(a[v]=hallway(v,ZV[z],true))};
 /* draw a sprite in whichever world is showing */
 function vblit(set,cx,by,s){const b=set[0],k=s/VK,w=b.width*k,h=b.height*k;if(w<.3||h<.3)return;const t=s*SS;let x=cx-w/2,y=by-h;
   if(t>=4){x=Math.round(x*SS);y=Math.round(y*SS);ctx.imageSmoothingEnabled=false;ctx.drawImage(b,x/SS,y/SS,Math.round(w*SS)/SS,Math.round(h*SS)/SS);ctx.imageSmoothingEnabled=true;return}
@@ -201,7 +199,7 @@ function sline(x,x0,y0,x1,y1,seed,col=INK,amp=1){x.fillStyle=col;const dx=x1-x0,
   for(let i=0;i<=n;i++){const t=i/n,w=amp&&Math.round(Math.sin(i*fr+ph)*.75+Math.sin(i*fr*2.7+ph*1.7)*.35);let px=x0+dx*t,py=y0+dy*t;if(steep)px+=w;else py+=w;x.fillRect(Math.round(px),Math.round(py),1,1)}}
 
 /* ---------- state ---------- */
-let root=null,gc,ctx,dc,dctx,btn,raf=0,tr=0,busy=false,prevFocus=null,last=0,dirty=true,p0=null,rzT=0;
+let root=null,gc,ctx,dc,dctx,btn,raf=0,busy=false,prevFocus=null,last=0,dirty=true,p0=null,rzT=0;
 let iw=0,ih=0,CX=0,HY=0,GY=0,LW=0,HC=0,ZMIN=0,BGM=0,BG=[],cards={};
 const G={state:"title",t:0,dist:0,speed:V0,keys:0,lane:0,x:0,jy:0,vy:0,slide:0,sbuf:0,jbuf:0,anim:0,objs:[],next:0,hitT:0,boil:0,boilT:0,pop:0,score:0,best:0,newBest:false,frames:0,ms:0,
   mult:1,maxMult:1,kpts:0,bonus:0,near:0,sq:0,cam:0,freeze:0,sl0:-9,passedBest:false,bestD:0,trs:{},trI:0,mag:0,boost:0,shield:0,grace:0,nextPU:0,zone:0,zprev:0,zf:9,lap:0,vk:0,vox:0,vtr:0,slo:0,fxT:9,fxIn:true};
@@ -215,7 +213,7 @@ function loadAudio(chime){if(window.VKAudio||loadAudio.l)return;loadAudio.l=1;co
 function sfx(n,a){if(window.__sfx)__sfx.push([performance.now(),n,a]);const A=AU();if(A)try{A.play(n,a)}catch(e){}}
 /* floating labels: CLOSE +25, X3 STREAK, NEW BEST */
 const POP=[];
-function pop(t,col){POP.push({t,col,x:CX+G.x*LW,a:0,row:POP.length});if(POP.length>3)POP.shift();POP.forEach((p,i)=>p.row=i)}
+function pop(t,col){POP.push({t,col,a:0,row:POP.length});if(POP.length>3)POP.shift();POP.forEach((p,i)=>p.row=i)}
 const qz=z=>D/(z+D),fY=q=>HY+(GY-HY)*q,cY=q=>HY+(GY-HY-HC)*q;
 const score=()=>Math.floor(G.dist/2)+G.kpts+G.bonus;
 /* dust at the runner's feet: a small fixed pool, nothing allocated while running */
@@ -407,8 +405,8 @@ function track(n,d){try{if(window.va)window.va("event",d?{name:n,data:d}:{name:n
 let RUNS=0;
 /* frame pacing: add ?fps to the page address to see it live; once a visit, after ten seconds of running, the typical rate is counted */
 const FPSM=/[?&]fps\b/.test(location.search),FT=[],FA=[];let FPS1=0;
-function fpsNote(dt){FT.push(dt);if(FT.length>60)FT.shift();if(FPS1)return;FA.push(dt);
-  if(FA.length>=600){FPS1=1;const a=FA.sort((x,y)=>x-y),b=v=>String(Math.min(120,Math.round(1/v/5)*5));track("fps",{typical:b(a[a.length>>1]),worst5pct:b(a[Math.floor(a.length*.95)]),device:TOUCH?"phone":"desktop"})}}
+function fpsNote(dt){if(FPSM){FT.push(dt);if(FT.length>60)FT.shift()}if(FPS1)return;FA.push(dt);
+  if(FA.length>=600){FPS1=1;const a=FA.sort((x,y)=>x-y),b=v=>String(Math.min(120,Math.round(1/v/5)*5));track("fps",{typical:b(a[a.length>>1]),worst5pct:b(a[Math.floor(a.length*.95)]),device:TOUCH?"phone":"desktop"});FA.length=0}}
 function drawFps(){if(!FT.length)return;const s=Math.round(FT.length/FT.reduce((a,b)=>a+b,0))+" FPS",k=Math.max(1,Math.round(HS*.6));text(ctx,s,HS*3,gc.height-HS*6,k,RED)}
 function lbNext(){if(G.auto)toBoard();else if(lbQual(G.score))toName();else nameSkip()}
 /* once you've signed the board, later runs that make it are signed for you the moment they end,
@@ -547,11 +545,11 @@ function setPiece(Zi){const tier=G.lap||G.dist>900?1:0,pool=SETS[Zi].filter(e=>e
   /* never the same one twice in a row */let e;for(let i=0;i<4;i++){e=pool[Math.random()*pool.length|0];if(e[1]!==G.pn)break}G.pn=e[1];return e[2].slice()}
 function placeRow(r,z,Zi){
   for(let i=0;i<3;i++){const c=r[i],L=i-1;if(c===".")continue;
-    if(c==="k"||c==="j"||c==="s"){const id=++G.trI;G.trs[id]={got:0,broken:false};for(let k=0;k<5;k++)G.objs.push({t:"key",lane:L,z:z-1+k*1.5,tr:id});if(c==="k")continue}
+    if(c==="k"||c==="j"||c==="s"){const id=++G.trI;G.trs[id]={got:0,broken:false,left:5};for(let k=0;k<5;k++)G.objs.push({t:"key",lane:L,z:z-1+k*1.5,tr:id});if(c==="k")continue}
     const t=c==="C"?"cab":c==="J"||c==="j"?"stack":"sign";
     G.objs.push({t,v:t==="cab"?(Math.random()<PCAB[Zi]?"cab":Zi===4&&Math.random()<.5?"pine":VAR[Zi][0]):VAR[Zi][t==="stack"?1:2],lane:L,z})}}
 function row(z){const A=G.dist+z,ga=A-Math.round(A/ZL)*ZL;if(A>ZL/2&&A<BRK+20&&ga>-6&&ga<10)return;/* nothing in or just behind a doorway */
-  if(A>BRK-14&&A<BRK+75){if(A>BRK+12&&Math.random()<.7){const L=[-1,0,1][Math.random()*3|0],id=++G.trI;G.trs[id]={got:0,broken:false};for(let i=0;i<5;i++)G.objs.push({t:"key",lane:L,z:z-1+i*1.5,tr:id})}return}/* the way out is clear: just keys to follow */
+  if(A>BRK-14&&A<BRK+75){if(A>BRK+12&&Math.random()<.7){const L=[-1,0,1][Math.random()*3|0],id=++G.trI;G.trs[id]={got:0,broken:false,left:5};for(let i=0;i<5;i++)G.objs.push({t:"key",lane:L,z:z-1+i*1.5,tr:id})}return}/* the way out is clear: just keys to follow */
   const Zi=zoneOf(A);
   if(!G.pq.length&&Math.random()<setChance()){const q=setPiece(Zi);if(q)G.pq=q}
   if(G.pq.length){placeRow(G.pq.shift(),z,Zi);return}
@@ -562,7 +560,7 @@ function row(z){const A=G.dist+z,ga=A-Math.round(A/ZL)*ZL;if(A>ZL/2&&A<BRK+20&&g
   lanes.forEach((L,i)=>{const t=types[i];G.objs.push({t,v:t==="cab"?(Math.random()<PCAB[Zi]?"cab":Zi===4&&Math.random()<.5?"pine":VAR[Zi][0]):VAR[Zi][t==="stack"?1:2],lane:L,z})});
   const free=[-1,0,1].filter(L=>!lanes.includes(L));
   if(free.length&&G.dist>G.nextPU&&!G.objs.some(o=>o.t==="pu")){const L=free.splice(Math.random()*free.length|0,1)[0];const k=pickPU();if(k==="vox")voxQueue();G.objs.push({t:"pu",k,lane:L,z});G.nextPU=G.dist+rr(220,360)}
-  if(free.length&&Math.random()<.6){const L=free[Math.random()*free.length|0],id=++G.trI;G.trs[id]={got:0,broken:false};for(let i=0;i<5;i++)G.objs.push({t:"key",lane:L,z:z-1+i*1.5,tr:id})}}
+  if(free.length&&Math.random()<.6){const L=free[Math.random()*free.length|0],id=++G.trI;G.trs[id]={got:0,broken:false,left:5};for(let i=0;i<5;i++)G.objs.push({t:"key",lane:L,z:z-1+i*1.5,tr:id})}}
 /* five keys in a row raise the multiplier; breaking a row you started lowers it */
 function gotKey(o){o.dead=1;G.lk=G.dist;G.keys++;G.pop=.3;G.kpts+=10*G.mult*(G.vox>0?2:1);const tr=G.trs[o.tr];let n=0;
   if(tr){n=++tr.got;if(n===5&&!tr.broken&&G.mult<5){G.mult++;G.maxMult=Math.max(G.maxMult,G.mult);pop("X"+G.mult+" STREAK",RED);sfx("trail",G.mult)}}
@@ -615,7 +613,9 @@ function update(h){
   if(!G.passedBest&&G.bestD>40&&G.dist>G.bestD){G.passedBest=true;pop("NEW BEST",RED);sfx("best")}
   if(CH&&!G.beatCh&&score()>CH.s){G.beatCh=1;pop("YOU BEAT "+chName()+"!",RED);sfx("best")}
   lbMarks()
-  let j=0;for(const o of G.objs)if(o.z>ZMIN-1.5&&!o.dead)G.objs[j++]=o;G.objs.length=j}
+  /* Retire a trail only after its last key leaves the object list: no later pickup or miss can read it. */
+  let j=0;for(const o of G.objs){if(o.z>ZMIN-1.5&&!o.dead)G.objs[j++]=o;
+    else if(o.t==="key"){const tr=G.trs[o.tr];if(tr&&--tr.left===0)delete G.trs[o.tr]}}G.objs.length=j}
 /* through the second vault door and out of the building */
 function breakout(){G.zf=9;G.woods=1;G.lap++;G.brk=0;G.wt=0;G.snap=1;G.deer=BRK+rr(260,420);const b=1000*G.mult;G.bonus+=b;pop("BROKE OUT +"+b,RED);
   if(!REDUCED)G.slo=SLO;sfx("breakout");if(!track.esc){track.esc=1;track("escaped")}if(!WSEEN){WSEEN=true;store("vk_run_woods",1)}wprep(true,G.vox>0);
@@ -696,7 +696,7 @@ function decor(Z){const H=HC,d=Z.d,fr=v=>{const t=Math.sin(v)*43758.5453;return 
       else{ctx.fillStyle=Z.line;wq(sg,z,z+7,H*.12,H*.12+2);wq(sg,z,z+7,H*.5,H*.5+2);wq(sg,z+3.5,z+3.58,0,H*.8);ctx.fillStyle=PAL.M;for(let i=0;i<4;i++){const a=z+.6+i*1.75;wq(sg,a,a+.14,H*.31,H*.31+1.6)}}}}
   ctx.globalAlpha=1}
 function scenery(){const x=ctx,Z=(VX?ZV:ZONES)[G.zone],px=1/SS,sn=v=>Math.round(v*SS)/SS,th=Math.max(px,Math.round(SS*.5)/SS),wd=q=>Math.max(px,sn(th*Math.min(1.6,q)));
-  if(VX)vblocks(Z,sn,th);decor(Z);if(!VX)drawDoor(Z);const SP2=VX||Z.d==="art"?2.5:5;
+  if(VX)vblocks(Z,sn);decor(Z);if(!VX)drawDoor(Z);const SP2=VX||Z.d==="art"?2.5:5;
   x.fillStyle=Z.seam;for(let z=zs(SP2,2);z<FAR;z+=SP2){const q=qz(z),y=sn(fY(q));if(y>=ih)continue;const hw=WX*LW*q;x.fillRect(sn(CX-hw),y,sn(hw*2),wd(q))}
   x.fillStyle=Z.line;for(let z=zs(4,0);z<FAR;z+=4){const za=Math.max(z,ZMIN-.2),zb=z+1.8;if(zb<=za)continue;const qa=qz(za),qb=qz(zb),ya=fY(qa),yb=fY(qb);
     for(const sg of[-1,1]){const xa=CX+sg*LW*.5*qa,xb=CX+sg*LW*.5*qb,wa=th*.8*qa,wb=th*.8*qb;x.beginPath();x.moveTo(xa-wa,ya);x.lineTo(xa+wa,ya);x.lineTo(xb+wb,yb);x.lineTo(xb-wb,yb);x.fill()}}
@@ -721,7 +721,7 @@ function omens(sn){const H=HC,px=1/SS;
     ln(cx,cy+wh*.12,cx-fx*.12,cy+wh*.45);ln(cx-fx*.12,cy+wh*.45,cx+fx*.08,cy+wh*.7);ln(cx+fx*.08,cy+wh*.7,cx-fx*.05,fy);if(p>.4){ln(cx-fx*.12,cy+wh*.45,cx-fx*.55,cy+wh*.38);ln(cx+fx*.08,cy+wh*.7,cx+fx*.5,cy+wh*.82)}
     ctx.globalAlpha=1}}
 /* the Other Side: square floor tiles and walls laid in courses of blocks, joints staggered */
-function vblocks(Z,sn,th){const x=ctx,H=HC,CH=VCH,px=1/SS;
+function vblocks(Z,sn){const x=ctx,H=HC,CH=VCH,px=1/SS;
   x.fillStyle="rgba(40,52,110,.06)";for(let z=zs(2.5,2);z<34;z+=2.5){const za=Math.max(z,ZMIN-.2),zb=z+2.5,qa=qz(za),qb=qz(zb),ya=fY(qa),yb=fY(qb),r=Math.round((G.dist+z-2)/2.5)&1;
     x.beginPath();for(let c=-3;c<3;c++){if(((c+3)&1)!==r)continue;const k0=c<-2?-1.85:c<-1?-1.5:c<0?-1:c<1?0:c<2?1:1.5,k1=c<-2?-1.5:c<-1?-1:c<0?0:c<1?1:c<2?1.5:1.85;
       x.moveTo(CX+k0*LW*qa,ya);x.lineTo(CX+k1*LW*qa,ya);x.lineTo(CX+k1*LW*qb,yb);x.lineTo(CX+k0*LW*qb,yb);x.closePath()}x.fill()}
@@ -839,7 +839,7 @@ function motes(){const x=ctx,px=1/SS;for(let i=0;i<16;i++){const a=(i*.6180339)%
 /* crossing over: a fountain of cubes from the runner and a quick flash; the new world spreads out from them */
 function fountain(inn){const px=CX+G.x*LW,C=inn?[PAL.y,VB,WHITE,PAL.p]:[WHITE,LINE,PAPER,VB];
   for(let i=0;i<26;i++)puff(px+rr(-8,8),GY-rr(8,34),rr(-95,95),rr(-190,-50),rr(.8,1.25),Math.random()<.5?4:3,false,C[i&3])}
-function burstFx(sx){if(G.fxT>.22)return;const x=ctx;x.globalAlpha=(1-G.fxT/.22)*(G.fxIn?.6:.4);x.fillStyle=G.fxIn?"#F4F6FF":WHITE;x.fillRect(0,0,gc.width,gc.height);x.globalAlpha=1}
+function burstFx(){if(G.fxT>.22)return;const x=ctx;x.globalAlpha=(1-G.fxT/.22)*(G.fxIn?.6:.4);x.fillStyle=G.fxIn?"#F4F6FF":WHITE;x.fillRect(0,0,gc.width,gc.height);x.globalAlpha=1}
 /* a slow sheen that sweeps across the Other Side every few seconds, like light across glass */
 function shine(){const x=ctx,ph=(G.t%5)/5;if(ph>.18)return;const W=gc.width,H=gc.height,p=ph/.18,c=-.35*W+p*(1.7*W),w=W*.09,sl=H*.45;
   x.globalAlpha=.22*Math.sin(Math.PI*p);x.fillStyle=WHITE;x.beginPath();x.moveTo(c-w,H);x.lineTo(c+w,H);x.lineTo(c+w+sl,0);x.lineTo(c-w+sl,0);x.fill();
@@ -866,7 +866,7 @@ function draw(){const t0=performance.now(),x=ctx;let sx=0,sy=0;if(G.state==="roo
   x.setTransform(1,0,0,1,0,0);x.imageSmoothingEnabled=false;
   if(G.zone===4&&SHAT&&G.brk<1.8&&G.state!=="title")drawShat();else if(G.zone===3&&G.lap===1&&G.dist>BRK-5&&G.state==="run")keepFrame();
   if(G.state==="title"&&WSEEN)titleLeaf();
-  if(!REDUCED&&G.fxT<.8)burstFx(sx);
+  if(!REDUCED&&G.fxT<.8)burstFx();
   if(V&&!(G.vtr>0)&&!REDUCED)shine();
   if(G.fin>0&&G.state==="run"){x.fillStyle="rgba(5,6,8,"+Math.min(1,G.fin/.8)+")";x.fillRect(0,0,gc.width,gc.height)}/* back from the room */
   if(G.freeze>0){x.globalAlpha=G.freeze/.11*.5;x.fillStyle=WHITE;x.fillRect(0,0,gc.width,gc.height);x.globalAlpha=1}/* hit flash */
@@ -904,7 +904,7 @@ function drawDoor(Z){if(G.lap||G.zone)return;const z=doorZ();if(z<ZMIN-2||z>FAR-
 const doorHum=()=>{if(!doorOn())return 0;const z=doorZ();return z<-3||z>34?0:Math.pow(1-Math.abs(z)/34,2)};
 function snapHall(){const c=mk(gc.width,gc.height),o=ctx;ctx=c.getContext("2d");ctx.imageSmoothingQuality="high";G.noPl=1;
   try{world(G.vox>0,0,0);ctx.setTransform(1,0,0,1,0,0);hud()}catch(e){}G.noPl=0;ctx=o;return c}
-function enterRoom(){SNAP=snapHall();G.rmUsed=1;G.state="room";Object.assign(R,{t:0,l:0,r:0,rx:0,rz:-.9,face:0,walk:0,last:0,rep:-1,know:0,gl:0,out:-1,ml:G.lane,mx:G.lane,mj:0,ms:0,mg:0,flash:-9,seen:G.il.length,wait:0});
+function enterRoom(){SNAP=snapHall();G.rmUsed=1;G.state="room";Object.assign(R,{t:0,l:0,r:0,rx:0,rz:-.9,face:0,walk:0,last:0,rep:-1,know:0,gl:0,out:-1,ml:G.lane,mx:G.lane,mj:0,ms:0,flash:-9,seen:G.il.length,wait:0});
   POP.length=0;sfx("door");dirty=true}
 function exitRoom(){G.state="run";G.objs=G.objs.filter(o=>!(o.z<26&&(o.t==="cab"||o.t==="stack"||o.t==="sign")));G.lane=-1;G.x=-1;G.fin=.8;G.slide=0;G.jy=0;G.vy=0;SNAP=null;sfx("doorOut");dirty=true}
 function roomAct(a){if(a==="pause"||R.out>=0)return;const c=a==="left"?0:a==="right"?1:a==="down"?3:a==="up"||a==="go"?2:-1;if(c<0)return;
@@ -969,7 +969,7 @@ function drawRoom(){const x=ctx,t=R.t,H=HC,px=1/SS,sn=v=>Math.round(v*SS)/SS;x.s
   [-1.55,-.78,.78,1.55].forEach((l,i)=>{const mx=CX+l*LW*qm-mw/2;x.fillStyle=INK;x.fillRect(mx-px*2,my-px*2,mw+px*4,mh+px*4);x.fillRect(CX+l*LW*qm-px*2,my+mh,px*4,H*.012*qm+px);
     x.fillStyle="#0B1A12";x.fillRect(mx,my,mw,mh);const g=R.t-R.flash<.18?"#E8FFF0":"#3CDC78";
     if(i<2){/* the inputs, newest at the bottom; at the desk the whole run scrolls past */const rows=Math.max(1,Math.floor((mh-s1)/(s1*7))),cols=Math.max(1,Math.floor((mw-s1)/(s1*7))),per=rows*cols,end=i===0?shown:Math.max(0,shown-per);
-      for(let j=0;j<per;j++){const idx=end-per+j+(i===0?0:0);if(idx<0||idx>=n)continue;const cc=j%cols,rr=j/cols|0;arrow(LOG[idx],mx+s1+cc*s1*7,my+s1+rr*s1*7,s1,idx>=n-1&&R.t-R.flash<.3?"#E8FFF0":idx>=R.seen?"#9CFFC0":"#2E9E5A")}}
+      for(let j=0;j<per;j++){const idx=end-per+j;if(idx<0||idx>=n)continue;const cc=j%cols,rr=j/cols|0;arrow(LOG[idx],mx+s1+cc*s1*7,my+s1+rr*s1*7,s1,idx>=n-1&&R.t-R.flash<.3?"#E8FFF0":idx>=R.seen?"#9CFFC0":"#2E9E5A")}}
     else if(i===2){const v=String(Math.min(n,shown)).padStart(4,"0");text(x,v,mx+(mw-tw(v,s1))/2,my+(mh-5*s1)/2,s1,g)}
     else{x.fillStyle="#3CDC78";for(let k2=0;k2<mw/px/2;k2++){const yy=Math.sin(k2*.5+t*6)*Math.sin(k2*.13+t)*(R.t-R.flash<.4?1:.35);x.fillRect(mx+k2*px*2,my+mh/2+yy*mh*.4,px*2,px)}}});
   x.fillStyle="#2A3036";x.fillRect(CX-LW*.45*qm,fY(qm)-dh*qm-px*2,LW*.9*qm,px*2);/* keyboard */
@@ -1045,7 +1045,7 @@ function wave(inn){const cw=Math.ceil(iw/CELL),ch=Math.ceil(ih/CELL),[f,g]=focus
 function cells(){const cw=Math.ceil(iw/CELL),ch=Math.ceil(ih/CELL),R=Math.hypot(cw/2,ch/2),a=[];
   for(let j=0;j<ch;j++)for(let i=0;i<cw;i++)a.push([i*CELL*SS,j*CELL*SS,Math.hypot(i+.5-cw/2,j+.5-ch/2)/R+Math.random()*.3]);return a.sort((p,q)=>p[2]-q[2])}
 function blocks(list,dur,each,done){let k=0;const t0=performance.now();
-  const step=t=>{const p=Math.min(1,(t-t0)/dur),m=Math.round(list.length*p*p*(3-2*p));while(k<m)each(list[k++]);if(p<1)tr=requestAnimationFrame(step);else{tr=0;done()}};tr=requestAnimationFrame(step)}
+  const step=t=>{const p=Math.min(1,(t-t0)/dur),m=Math.round(list.length*p*p*(3-2*p));while(k<m)each(list[k++]);if(p<1)requestAnimationFrame(step);else done()};requestAnimationFrame(step)}
 function shown(){dc.style.display="none";root.classList.add("on");document.documentElement.classList.add("vkg-lock");/* hide the page scrollbar under the game */busy=false;root.focus({preventScroll:true});last=0;dirty=true;raf=requestAnimationFrame(frame)}
 function open(){if(root||busy)return;busy=true;prevFocus=document.activeElement;sprites();
   if(!document.getElementById("vkg-css")){const st=document.createElement("style");st.id="vkg-css";st.textContent=CSS;document.head.appendChild(st)}
