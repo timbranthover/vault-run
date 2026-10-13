@@ -12,3 +12,6 @@ Read README.md and CONTRIBUTING.md first; their rules apply to you.
 - Test locally with `npm run serve` (in-memory board) and `npm test`. `VKGame._G` exposes game state
   for tests; `tests/bot.js` is an autopilot.
 - Visual changes: render before and after at phone size (390x844 at 3x) and desktop (1366x768).
+- The room (a hidden server room behind a door in the mailroom) lives in the "room that runs the game" section of
+  `public/game.js`; `DOOR_A` sets where the door is. Its sounds are `door`, `relay`, `replay`, `know`, `wait` and the drone
+  in `public/audio.js`. `tests/smoke.mjs` walks in and out of it. Keep it wordless apart from WAITING FOR INPUT.

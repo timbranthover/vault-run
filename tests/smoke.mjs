@@ -22,6 +22,14 @@ for (const [name, opts] of [["phone", { viewport: { width: 390, height: 844 }, d
   }
   await pg.evaluate("VKGame._G.grace=1e9;window.dispatchEvent(new KeyboardEvent('keydown',{code:'ArrowDown',key:'ArrowDown',bubbles:true}))"); await pg.waitForTimeout(300);
   if (!(await pg.evaluate("VKGame._G.slide>0"))) fail(`${name}: slide did not start`); else ok(`${name}: ran every zone and slid`);
+  // the room: in through the door in the mailroom, to the desk, and back out to the same run
+  await pg.evaluate("clearInterval(window.__bot);const G=VKGame._G;G.lap=0;G.zone=0;G.vox=0;G.dist=420;G.lane=-1;G.x=-1;G.jy=0;G.grace=1e9;G.objs=G.objs.filter(o=>o.t==='key')");
+  await pg.waitForFunction("440-VKGame._G.dist<2", null, { timeout: 8000, polling: 10 }); await pg.keyboard.press("ArrowLeft"); await pg.waitForTimeout(300);
+  if (await pg.evaluate("VKGame.state") !== "room") fail(`${name}: the door did not open`);
+  else { for (const k of ["ArrowUp", "ArrowUp"]) { await pg.keyboard.press(k); await pg.waitForTimeout(900) } await pg.waitForTimeout(4200);
+    const know = await pg.evaluate("VKGame._R.know"); for (let i = 0; i < 3; i++) { await pg.keyboard.press("ArrowDown"); await pg.waitForTimeout(1100) } await pg.waitForTimeout(600);
+    const back = await pg.evaluate("[VKGame.state,VKGame._G.objs.some(o=>o.z<12&&(o.t==='cab'||o.t==='stack'||o.t==='sign'))]");
+    if (!know) fail(`${name}: no realization at the desk`); else if (back[0] !== "run" || back[1]) fail(`${name}: did not return safely to the run`); else ok(`${name}: the room, in and out`) }
   await pg.evaluate("clearInterval(window.__bot);const G=VKGame._G;G.grace=0;G.shield=0;G.boost=0;G.objs.push({t:'cab',v:'cab',lane:Math.round(G.x),z:1.5})"); await pg.waitForTimeout(3500);
   if (await pg.evaluate("VKGame.state") !== "over") fail(`${name}: crash did not end the run`); else ok(`${name}: game over`);
   const t = await pg.evaluate("VKGame._share()"); if (!/\/r\/\S+$/.test(t)) fail(`${name}: share text has no challenge link: ${t}`); else ok(`${name}: share text`);

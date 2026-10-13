@@ -5,8 +5,8 @@
 (()=>{"use strict";
 if(window.VKAudio)return;
 
-let C=null,OUT,LIM,SFX,MUS,DK,MF,tw=0,AMB,AF,HUM,REV,RET,NB,amb=null,wind=null,timer=0,OFF=false;
-const S={state:"",zone:0,vox:false,sp:0,x:0,mult:1,slo:0,boost:false,night:0};
+let C=null,OUT,LIM,SFX,MUS,DK,MF,tw=0,AMB,AF,HUM,REV,RET,NB,DH,amb=null,wind=null,drone=null,timer=0,OFF=false;
+const S={state:"",zone:0,vox:false,sp:0,x:0,mult:1,slo:0,boost:false,night:0,door:0};
 const mtof=m=>440*Math.pow(2,(m-69)/12),R=(a,b)=>a+Math.random()*(b-a),pick=a=>a[Math.random()*a.length|0];
 
 /* ---------- the mix ---------- */
@@ -20,12 +20,20 @@ function build(ctx){C=ctx;
   NB=C.createBuffer(1,C.sampleRate*2,C.sampleRate);const d=NB.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
   /* room tone: one quiet looping noise, coloured per zone */
   AF=C.createBiquadFilter();AF.type="bandpass";AF.frequency.value=500;AF.Q.value=.5;AMB=C.createGain();AMB.gain.value=0;AF.connect(AMB);AMB.connect(OUT);
-  HUM=C.createGain();HUM.gain.value=0;HUM.connect(OUT)}
+  HUM=C.createGain();HUM.gain.value=0;HUM.connect(OUT);DH=C.createGain();DH.gain.value=0;DH.connect(OUT)}
 function impulse(sec,decay){const sr=C.sampleRate,n=sr*sec|0,b=C.createBuffer(2,n,sr);
   for(let ch=0;ch<2;ch++){const d=b.getChannelData(ch);let lp=0;for(let i=0;i<n;i++){const t=i/n;lp+=((Math.random()*2-1)-lp)*(.35+.6*(1-t));d[i]=lp*Math.pow(1-t,decay)*Math.min(1,i/(sr*.008))}}return b}
 function startLoops(t){
   amb=C.createBufferSource();amb.buffer=NB;amb.loop=true;amb.connect(AF);amb.start(t);
-  for(const f of[50,100,150]){const o=C.createOscillator(),g=C.createGain();o.frequency.value=f;g.gain.value=f===50?1:f===100?.5:.2;o.connect(g);g.connect(HUM);o.start(t)}}
+  for(const f of[50,100,150]){const o=C.createOscillator(),g=C.createGain();o.frequency.value=f;g.gain.value=f===50?1:f===100?.5:.2;o.connect(g);g.connect(HUM);o.start(t)}
+  /* the hum behind the door in the mailroom: mains and a faint whine, nearly nothing until you're beside it */
+  for(const[f,v]of[[120,1],[240,.55],[360,.25],[2960,.04]]){const o=C.createOscillator(),g=C.createGain();o.frequency.value=f;g.gain.value=v;o.connect(g);g.connect(DH);o.start(t)}}
+/* the room that runs the game: fans, a low drone that beats against itself, the mains hum */
+function droneOn(on,t){if(on&&!drone){const g=C.createGain();g.gain.value=.0001;g.gain.setTargetAtTime(1,t,.8);g.connect(OUT);
+    const s=C.createBufferSource(),f=C.createBiquadFilter(),ng=C.createGain();s.buffer=NB;s.loop=true;f.type="bandpass";f.frequency.value=700;f.Q.value=.9;ng.gain.value=.022;s.connect(f);f.connect(ng);ng.connect(g);s.start(t);
+    const os=[[55,.05],[55.6,.04],[110.3,.018],[164.8,.008],[1840,.0016]].map(([fr,v])=>{const o=C.createOscillator(),og=C.createGain();o.frequency.value=fr;og.gain.value=v;o.connect(og);og.connect(g);o.start(t);return o});
+    const l=C.createOscillator(),lg=C.createGain();l.frequency.value=.09;lg.gain.value=180;l.connect(lg);lg.connect(f.frequency);l.start(t);drone={g,src:[s,l].concat(os)}}
+  else if(!on&&drone){drone.g.gain.setTargetAtTime(.0001,t,.15);for(const n of drone.src)n.stop(t+.9);drone=null}}
 
 /* ---------- voices ---------- */
 function env(p,t,a,peak,d,h){p.value=0;p.setValueAtTime(.0001,t);/* silent until it starts: no stray click */p.linearRampToValueAtTime(peak,t+a);if(h)p.setValueAtTime(peak,t+a+h);p.exponentialRampToValueAtTime(.0001,t+a+(h||0)+d)}
@@ -119,6 +127,14 @@ function swell(t,d,up,v){noise(t,d,{ft:"bandpass",f:up?400:5000,f1:up?5000:400,q
 
 /* ---------- every sound in the game ---------- */
 const P={
+  door:()=>{const t=now();noise(t,.7,{f:320,f1:760,q:7,a:.25,v:.05});tone(70,t+.55,.18,{f1:45,v:.2});noise(t+.55,.06,{ft:"lowpass",f:900,v:.12})},
+  doorOut:()=>{const t=now();tone(68,t,.2,{f1:40,v:.18});noise(t,.05,{ft:"lowpass",f:800,v:.1})},
+  relay:c=>{const t=now(),p=[-.6,.6,0,0][c]||0;noise(t,.012,{ft:"highpass",f:4000,v:.09,pan:p});tone(1400+c*90,t,.025,{v:.018,pan:p});tone(90,t+.004,.04,{f1:60,v:.06,pan:p})},
+  rstep:x=>{const t=now();tone(95,t,.07,{f1:60,v:.08,pan:(x||0)*.3});noise(t,.03,{ft:"lowpass",f:600,v:.05,pan:(x||0)*.3})},
+  replay:n=>{const t=now(),k=Math.min(90,Math.max(12,n|0));for(let i=0;i<k;i++){const u=i/k,tt=t+3.2*(1-Math.pow(1-u,1.6));noise(tt,.008,{ft:"highpass",f:R(3000,5500),v:.05*(.4+u),pan:R(-.8,.8)})}
+    tone(55,t,3.2,{f1:82,a:2.6,v:.07,rv:.5})},
+  know:()=>{const t=now();tone(41,t,3,{a:.4,v:.16,h:1});tone(61.7,t+.2,3,{a:.8,v:.06,h:.8,rv:.6});bell(mtof(69),t+.3,.025,{rv:.9});bell(mtof(64),t+1.6,.018,{rv:.9})},
+  wait:()=>{const t=now();tone(880,t,.12,{v:.02,rv:.5});tone(880,t+.5,.12,{v:.012,rv:.5})},
   step:a=>step(a,now()),
   jump:()=>{const t=now();noise(t,.18,{f:500,f1:1900,q:.9,v:.16,pan:S.x*.3});tone(170,t,.12,{f1:360,v:.06,pan:S.x*.3})},
   land:()=>{const t=now();tone(115,t,.13,{f1:45,v:.22});step(0,t);step(1,t+.012)},
@@ -183,7 +199,7 @@ function musicLevel(v,t,tc){MUS.gain.cancelScheduledValues(t);MUS.gain.setTarget
 function filt(f,t,tc){MF.frequency.cancelScheduledValues(t);MF.frequency.setTargetAtTime(f,t,tc||.1)}
 const AMBZ=[[480,.4,.012,0],[260,.3,.016,0],[1300,.25,.009,0],[180,.6,.016,.012],[700,.35,.014,0]];/* the last: wind in the trees */
 function room(t){const a=S.vox?[7000,.4,.006,0]:AMBZ[S.zone];AF.type=S.vox?"highpass":"bandpass";AF.frequency.setTargetAtTime(a[0],t,.5);AF.Q.setTargetAtTime(a[1],t,.5);
-  AMB.gain.setTargetAtTime(S.state==="run"||S.state==="title"?a[2]:a[2]*.4,t,.6);HUM.gain.setTargetAtTime(S.state==="run"?a[3]:0,t,.6)}
+  AMB.gain.setTargetAtTime(S.state==="room"?0:S.state==="run"||S.state==="title"?a[2]:a[2]*.4,t,.6);HUM.gain.setTargetAtTime(S.state==="run"?a[3]:0,t,.6)}
 function windOn(on,t){if(on&&!wind){const s=C.createBufferSource(),f=C.createBiquadFilter(),g=C.createGain();s.buffer=NB;s.loop=true;f.type="bandpass";f.frequency.value=1100;f.Q.value=.6;g.gain.value=.0001;
     g.gain.setTargetAtTime(.07,t,.1);s.connect(f);f.connect(g);g.connect(SFX);s.start(t);wind={s,g,f}}
   else if(!on&&wind){wind.g.gain.setTargetAtTime(.0001,t,.08);wind.s.stop(t+.5);wind=null}}
@@ -193,7 +209,10 @@ function tick(s){if(!C||OFF)return;const t=C.currentTime,prev=S.state,pz=S.zone,
     else if(S.state==="run"){MF.frequency.cancelScheduledValues(t);MF.frequency.setValueAtTime(18000,t);musicTo(S.vox?"other":MUSIC[S.zone],true);musicLevel(M.vol,t,.05)}
     else if(S.state==="pause"){filt(650,t,.08);musicLevel(M.vol*.55,t)}
     else if(S.state==="title"){MF.frequency.setValueAtTime(18000,t);musicTo("title",true);musicLevel(M.vol*.8,t,.4)}
+    else if(S.state==="room")tapeStop(t);
+    droneOn(S.state==="room",t);
     room(t)}
+  DH.gain.setTargetAtTime(S.state==="run"?S.door*.05:0,t,.12);
   if(S.state==="run"){
     if(S.vox!==pv){musicTo(S.vox?"other":MUSIC[S.zone],true);RET.gain.setTargetAtTime(S.vox?.75:.35,t,.3);room(t)}
     else if(S.zone!==pz){musicTo(MUSIC[S.zone]);room(t)}
@@ -217,5 +236,5 @@ window.VKAudio={
     at(t,n,a){T0=t;P[n]&&P[n](a)},set(o){Object.assign(S,o)},
     music(name,t0,t1,o){Object.assign(S,o||{});M.cur=M.want=name;M.step=0;M.bar=0;M.next=t0;M.int=(o&&o.int)||1;
       while(M.next<t1&&M.cur){const th=TH[M.cur],sd=60/bpm(th)/4,i=M.step%16;playStep(th,i,M.next+(i&1?(th.swing||0)*sd:0),sd);M.next+=sd;M.step++;if(M.step%16===0)M.bar++}},
-    raw:{tone,noise,glass,bell,mallet,ep,fm,pluck},tape(t){tapeStop(t)},tw(t){twinkle(t)},wd(t,k){k==="b"?chirp(t):k==="c"?crickets(t):owl(t)},rev(v){RET.gain.value=v},amb(o){Object.assign(S,o);room(0)}}}};
+    raw:{tone,noise,glass,bell,mallet,ep,fm,pluck},tape(t){tapeStop(t)},tw(t){twinkle(t)},wd(t,k){k==="b"?chirp(t):k==="c"?crickets(t):owl(t)},rev(v){RET.gain.value=v},amb(o){Object.assign(S,o);room(0)},drone(on,t){droneOn(on,t)},dh(v,t){DH.gain.setValueAtTime(v,t)}}}};
 })();

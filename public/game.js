@@ -41,6 +41,11 @@ const SLD0=["....kkkk....","...kkkkkk...","..skkkkkks..","...kkkkkk...","..wrwww
 const SLD1=["....kkkk....","...kkkkkk...","..skkkkkks..","s..kkkkkk..s","w...wssw...w","wwwwrwwwwwww","..wwwrrwwww.","..wwwwwrrrrr","..ddddddddVy",".ddddddddddr",".MMk....kMM."];
 const SLD2=["....kkkk....","...kkkkkk...","..skkkkkks..","...kkkkkk...","s...wssw...s","wwwwrwwwwwww","..wwwrrwwwww","..wwwwwrrrrr","..dddddddddV",".ddddddddddr",".MMk....kMM."];
 const SLIDE=["....kkkk....","...kkkkkk...","..skkkkkks..",".wwrwwwwwww.","wwwwrrwwwwww","swwwwwrrrrws",".dddddddddd.",".dddd..dddd.",".kk......kk."];
+/* facing you: on the way out of the room. The second set is after he knows: eyes on you, a flat mouth */
+const mir=r=>r.split("").reverse().join(""),FH=k=>["....kkkk....","...kkkkkk...","..kkkkkkkk..",k?"...sdssds...":"...ssssss...",k?"...wksskw...":"...skssks...",k?"....sdds....":"....ssss...."];
+const FRONT=k=>FH(k).concat(IDLE.slice(5).map(mir)),FWA=k=>FH(k).concat(RUN_A.slice(5).map(mir)),FWB=k=>FH(k).concat(RUN_B.slice(5).map(mir));
+/* a look back over his shoulder */
+const GLANCE=["....kkkk....","...kkkkkk...","...kkkkkkkk.","...kkkswks..","....kkssss.."].concat(IDLE.slice(5));
 /* the filing cabinet: brass label holders, and the day's paperwork piled on top in a red folder */
 const CAB=(()=>{const gap="kkkkkkkkkkkkkk",D=lab=>["GGGGGGGGGGGGGg","GGGGywwwwyGGGg","GGGGy"+lab+"yGGGg","GGGGGkkkkGGGGg","GGGGGGGGGGGGGg"];
   return["....wwwwww....","...Mwwwwwww...","..rrrrrrrrrr..","gggggggggggggg"].concat(D("MMMw"),[gap],D("MMww"),[gap],D("MMMM"),["g............g"])})();
@@ -182,7 +187,7 @@ function vblit(set,cx,by,s){const b=set[0],k=s/VK,w=b.width*k,h=b.height*k;if(w<
 function spr(n,cx,by,s,lane){if(VX&&n==="key")n="keyg";if(VX&&RW[n])vblit(vs(n,/^(z\d|door|ring)$/.test(n)?0:sdir(lane)),cx,by,s);else blit(SP[n],cx,by,s)}
 function sprites(){if(SP.cab)return;const V=r=>lv(sprite(r,1,true));
   Object.assign(RW,{runA:RUN_A,runB:RUN_B,jump:JUMP,idle:IDLE,slide:SLIDE,cab:CAB,key:KEY,keyg:KEYG,door:DOOR,ring:RING,z0:label("MAILROOM","k"),z1:label("ARCHIVE","k"),z2:label("LOBBY","k"),z3:label("VAULT","r"),pmag:PU_MAG,pbst:PU_BST,pshr:PU_SHR,pvox:PU_VOX},OBS);
-  Object.assign(SP,{runA:V(RUN_A),runB:V(RUN_B),jump:V(JUMP),idle:V(IDLE),slide:V(SLIDE),cab:V(CAB),key:V(KEY),keyg:V(KEYG),door:V(DOOR),ring:V(RING),z0:V(label("MAILROOM","k")),z1:V(label("ARCHIVE","k")),z2:V(label("LOBBY","k")),z3:V(label("VAULT","r")),pmag:V(PU_MAG),pbst:V(PU_BST),pshr:V(PU_SHR),pvox:V(PU_VOX),sh:lv(sprite(SHADOW,0,false))});for(const k in OBS)SP[k]=V(OBS[k]);for(const[k,v]of[["sd0",SLD0],["sd1",SLD1],["sd2",SLD2]]){RW[k]=v;SP[k]=V(v)}}
+  Object.assign(SP,{runA:V(RUN_A),runB:V(RUN_B),jump:V(JUMP),idle:V(IDLE),slide:V(SLIDE),cab:V(CAB),key:V(KEY),keyg:V(KEYG),door:V(DOOR),ring:V(RING),z0:V(label("MAILROOM","k")),z1:V(label("ARCHIVE","k")),z2:V(label("LOBBY","k")),z3:V(label("VAULT","r")),pmag:V(PU_MAG),pbst:V(PU_BST),pshr:V(PU_SHR),pvox:V(PU_VOX),sh:lv(sprite(SHADOW,0,false))});for(const k in OBS)SP[k]=V(OBS[k]);for(const[k,v]of[["sd0",SLD0],["sd1",SLD1],["sd2",SLD2],["gl",GLANCE],["f0n",FRONT(0)],["fan",FWA(0)],["fbn",FWB(0)],["f0k",FRONT(1)],["fak",FWA(1)],["fbk",FWB(1)]]){RW[k]=v;SP[k]=V(v)}}
 
 /* text */
 const GL={};
@@ -207,7 +212,7 @@ let SND=store("vk_run_sound")==="1";
 const AU=()=>SND&&window.VKAudio?window.VKAudio:null,TK={state:"",zone:0,vox:false,sp:0,x:0,mult:1,slo:0,boost:false};
 function loadAudio(chime){if(window.VKAudio||loadAudio.l)return;loadAudio.l=1;const s=document.createElement("script");s.src="audio.js?v=1";
   s.onload=()=>{if(SND&&window.VKAudio){VKAudio.unlock();if(chime)sfx("toggle")}};s.onerror=()=>{loadAudio.l=0;s.remove()};document.head.appendChild(s)}
-function sfx(n,a){const A=AU();if(A)try{A.play(n,a)}catch(e){}}
+function sfx(n,a){if(window.__sfx)__sfx.push([performance.now(),n,a]);const A=AU();if(A)try{A.play(n,a)}catch(e){}}
 /* floating labels: CLOSE +25, X3 STREAK, NEW BEST */
 const POP=[];
 function pop(t,col){POP.push({t,col,x:CX+G.x*LW,a:0,row:POP.length});if(POP.length>3)POP.shift();POP.forEach((p,i)=>p.row=i)}
@@ -515,7 +520,7 @@ function drawBoard(att){const w=170,top=LB.top.slice(0,10),me=att?null:LB.me,R0=
 /* ---------- game ---------- */
 function start(){LB.me=null;SHAT=null;if(LB.passOk){LB.pass="";seenSet();cards.t=null}
   RUNS++;if(RUNS===1)track("play",{from:CH?"challenge link":"direct",device:TOUCH?"phone":"desktop"});else if(RUNS===5||RUNS===20)track("runs "+RUNS+"+");
-  Object.assign(G,{state:"run",ph:"card",rid:Math.random().toString(36).slice(2,10),t:0,dist:0,speed:V0,keys:0,lane:0,x:0,jy:0,vy:0,slide:0,sbuf:0,jbuf:0,anim:0,next:-36,pop:0,step:0,mult:1,maxMult:1,kpts:0,bonus:0,near:0,sq:0,freeze:0,sl0:-9,passedBest:false,trs:{},mag:0,boost:0,shield:0,grace:0,nextPU:rr(150,230),zone:0,zprev:0,zf:9,lap:0,vk:0,vox:0,vtr:0,slo:0,fxT:9,woods:0,beatCh:0,brk:9,wt:9,snap:0,deer:0,ck:0,lk:0,pq:[],pn:0,lb10:LB.on&&LB.top.length>=10?LB.top[9].s:0,lb1:LB.on&&LB.top.length?LB.top[0].s:0,mk10:0,mk1:0,mkD10:0,mkD1:0});G.objs.length=0;POP.length=0;for(const p of PT)p.t=p.life=0;
+  Object.assign(G,{state:"run",ph:"card",rid:Math.random().toString(36).slice(2,10),t:0,dist:0,speed:V0,keys:0,lane:0,x:0,jy:0,vy:0,slide:0,sbuf:0,jbuf:0,anim:0,next:-36,pop:0,step:0,mult:1,maxMult:1,kpts:0,bonus:0,near:0,sq:0,freeze:0,sl0:-9,passedBest:false,trs:{},mag:0,boost:0,shield:0,grace:0,nextPU:rr(150,230),zone:0,zprev:0,zf:9,lap:0,vk:0,vox:0,vtr:0,slo:0,fxT:9,woods:0,beatCh:0,brk:9,wt:9,snap:0,deer:0,ck:0,lk:0,pq:[],pn:0,il:[],rmUsed:0,fin:0,lb10:LB.on&&LB.top.length>=10?LB.top[9].s:0,lb1:LB.on&&LB.top.length?LB.top[0].s:0,mk10:0,mk1:0,mkD10:0,mkD1:0});G.objs.length=0;POP.length=0;for(const p of PT)p.t=p.life=0;
   while(G.next<=0){row(SPAWN+G.next);G.next+=gap()}sfx("start");dirty=true}
 const gap=()=>Math.max(8,G.speed*.6)+Math.random()*6;
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
@@ -572,7 +577,7 @@ function nearMiss(s){G.near++;const b=25*G.mult;G.bonus+=b;pop("CLOSE +"+b,INK);
 function update(h){
   G.t+=h;G.speed=Math.min(VMAX,V0+G.dist*ACC);const dz=G.speed*(G.boost>0?1.55:1)*h;G.dist+=dz;G.anim+=dz*.45;
   for(const o of G.objs){o.z-=dz;if(o.t==="deer"){o.lane+=o.dir*h*3.2;if(o.lane*o.dir>3.4)o.dead=1}}
-  G.next-=dz;while(G.next<=0){row(SPAWN+G.next);G.next+=gap()}
+  G.next-=dz;while(G.next<=0){const n0=G.objs.length;row(SPAWN+G.next);doorClear(n0);G.next+=gap()}
   G.x+=(G.lane-G.x)*Math.min(1,h*18);G.cam+=(G.x*LW*.28-G.cam)*Math.min(1,h*6);G.sq*=Math.max(0,1-h*11);
   if(G.jbuf>0)G.jbuf-=h;
   if(G.jy>0){G.vy-=GRAV*h;G.jy+=G.vy*h;if(G.jy<=0){G.jy=0;G.vy=0;burst();G.sq=-1;sfx("land");if(G.sbuf){G.sbuf=0;G.slide=SLIDE_T;G.sl0=G.t}}}
@@ -691,7 +696,7 @@ function decor(Z){const H=HC,d=Z.d,fr=v=>{const t=Math.sin(v)*43758.5453;return 
       else{ctx.fillStyle=Z.line;wq(sg,z,z+7,H*.12,H*.12+2);wq(sg,z,z+7,H*.5,H*.5+2);wq(sg,z+3.5,z+3.58,0,H*.8);ctx.fillStyle=PAL.M;for(let i=0;i<4;i++){const a=z+.6+i*1.75;wq(sg,a,a+.14,H*.31,H*.31+1.6)}}}}
   ctx.globalAlpha=1}
 function scenery(){const x=ctx,Z=(VX?ZV:ZONES)[G.zone],px=1/SS,sn=v=>Math.round(v*SS)/SS,th=Math.max(px,Math.round(SS*.5)/SS),wd=q=>Math.max(px,sn(th*Math.min(1.6,q)));
-  if(VX)vblocks(Z,sn,th);decor(Z);const SP2=VX||Z.d==="art"?2.5:5;
+  if(VX)vblocks(Z,sn,th);decor(Z);if(!VX)drawDoor(Z);const SP2=VX||Z.d==="art"?2.5:5;
   x.fillStyle=Z.seam;for(let z=zs(SP2,2);z<FAR;z+=SP2){const q=qz(z),y=sn(fY(q));if(y>=ih)continue;const hw=WX*LW*q;x.fillRect(sn(CX-hw),y,sn(hw*2),wd(q))}
   x.fillStyle=Z.line;for(let z=zs(4,0);z<FAR;z+=4){const za=Math.max(z,ZMIN-.2),zb=z+1.8;if(zb<=za)continue;const qa=qz(za),qb=qz(zb),ya=fY(qa),yb=fY(qb);
     for(const sg of[-1,1]){const xa=CX+sg*LW*.5*qa,xb=CX+sg*LW*.5*qb,wa=th*.8*qa,wb=th*.8*qb;x.beginPath();x.moveTo(xa-wa,ya);x.lineTo(xa+wa,ya);x.lineTo(xb+wb,yb);x.lineTo(xb-wb,yb);x.fill()}}
@@ -703,7 +708,7 @@ function scenery(){const x=ctx,Z=(VX?ZV:ZONES)[G.zone],px=1/SS,sn=v=>Math.round(
 function exitHint(sn){const d=G.dist;if(G.state!=="run"||d<170||d>395)return;let a=Math.min(1,(d-170)/40);
   if(d>350&&frh(Math.floor(G.t*14))<(d-350)/45)return;/* dying flicker */
   const z=36,q=qz(z),s=P0*q*2.4,b=SP.exit[0],top=Math.max(0,cY(q)),y=top+10*q+b.height*s,px=1/SS;
-  ctx.globalAlpha=a;ctx.fillStyle=INK;for(const sg of[-1,1])ctx.fillRect(sn(CX+sg*b.width*s*.3),top,Math.max(px,q*.6),y-b.height*s-top);const gw=b.width*s*1.5,gh=b.height*s*1.8;ctx.globalAlpha=a*(.16+.06*Math.sin(G.t*5));ctx.fillStyle=PAL.f;ctx.fillRect(sn(CX-gw/2),sn(y-b.height*s/2-gh/2),gw,gh);ctx.globalAlpha=a;blit(SP.exit,CX,y,s);ctx.globalAlpha=1}
+  ctx.globalAlpha=a;ctx.fillStyle=INK;for(const sg of[-1,1])ctx.fillRect(sn(CX+sg*b.width*s*.3),top,Math.max(px,q*.6),y-b.height*s-top);const gw=b.width*s*1.5,gh=b.height*s*1.8;if(ROOMSEEN){ctx.globalAlpha=a*.3;blit(SP.exit,CX,y,s);ctx.globalAlpha=1;return}/* once he knows, the sign is dark */ctx.globalAlpha=a*(.16+.06*Math.sin(G.t*5));ctx.fillStyle=PAL.f;ctx.fillRect(sn(CX-gw/2),sn(y-b.height*s/2-gh/2),gw,gh);ctx.globalAlpha=a;blit(SP.exit,CX,y,s);ctx.globalAlpha=1}
 /* the second time round, the building starts to show the way out: EXIT signs, and light at the far end */
 function omens(sn){const H=HC,px=1/SS;
   for(let z=zs(19,6);z<FAR-4;z+=19){if(z<ZMIN-1)continue;const k=Math.round((G.dist+z-6)/19),zn=zoneOf(G.dist+z);if(zn===4||zn!==3&&frh(k*.917)<.45)continue;
@@ -760,11 +765,11 @@ function drawObj(o){if(o.t==="gate")return drawGate(o);const q=qz(o.z),s=P0*q,lx
     else if(top>yc){ctx.fillStyle=INK;if(HP[o.v]===1)ctx.fillRect(lx-lw/2,yc,lw,top-yc);else{const hw=img[0].width*s*.32;ctx.fillRect(lx-hw,yc,lw,top-yc);ctx.fillRect(lx+hw-lw,yc,lw,top-yc)}}spr(o.v,lx,by,s,o.lane)}
   else{blit(SP.sh,lx,fy+s*1.5,s*1.1);spr(o.v||o.t,lx,fy,s,o.lane)}
   ctx.globalAlpha=1}
-function drawPlayer(){const px=CX+G.x*LW;
+function drawPlayer(){if(G.noPl)return;const tg=G.state==="title"&&titleGl(),px=CX+G.x*LW+(tg&&((performance.now()/45)|0)%3===0?(((performance.now()/90)|0)%2?.6:-.6):0);
   blit(SP.sh,px,GY+3,P0*Math.max(.45,1-G.jy/70));
   if(G.state!=="title")drawDust();
   if(G.state==="over"&&G.hitT<.7&&((G.hitT*14)|0)%2)return;
-  const nm=G.state==="title"?"idle":G.slide>0&&G.jy===0?(SLIDE_T-G.slide<.07||G.slide<.1?"sd0":((G.t*18)|0)&1?"sd1":"sd2"):G.jy>0?"jump":(G.anim|0)&1?"runA":"runB",img=VX?vs(nm,sdir(G.x)):SP[nm],vk=VX?VK:1;
+  const nm=G.state==="title"?(tg?"gl":"idle"):G.slide>0&&G.jy===0?(SLIDE_T-G.slide<.07||G.slide<.1?"sd0":((G.t*18)|0)&1?"sd1":"sd2"):G.jy>0?"jump":(G.anim|0)&1?"runA":"runB",img=VX?vs(nm,sdir(G.x)):SP[nm],vk=VX?VK:1;
   const bob=G.state==="run"&&G.jy===0&&!(G.slide>0)&&((G.anim|0)&1)?1:0;
   const skid=G.slide>0&&G.jy===0&&SLIDE_T-G.slide>=.07&&G.slide>=.1,sq=G.sq,ax=P0*(1-.12*sq)/vk,ay=P0*(1+.16*sq)/vk,by=GY-G.jy-bob+(skid?1:0);
   if(skid&&G.state!=="title"){const e=SLIDE_T-G.slide,L=Math.min(16,(e-.07)*70),sn=v=>Math.round(v*SS)/SS;ctx.fillStyle=DUST;/* scrape marks on the floor behind the shoes */
@@ -805,7 +810,7 @@ function homeTap(cx,cy){if(!HB.live)return false;const r=gc.getBoundingClientRec
   for(const h of HB.hits)if(x>=h.x&&x<h.x+h.w&&y>=h.y&&y<h.y+h.h){h.a();return true}return false}
 /* standalone page: back to the home screen from a run or the board */
 function goHome(){LB.me=null;SHAT=null;Object.assign(G,{state:"title",ph:"card",tt:performance.now(),tHold:0,dist:0,lane:0,x:0,jy:0,slide:0,cam:0,sq:0,freeze:0,mag:0,boost:0,shield:0,grace:0,vox:0,vtr:0,slo:0,fxT:9,zone:0,zprev:0,zf:9,lap:0,woods:0,brk:9,wt:9});
-  G.objs.length=0;POP.length=0;cards.t=null;lbFetch();sfx("toggle");dirty=true}
+  G.objs.length=0;POP.length=0;cards.t=null;SNAP=null;lbFetch();sfx("toggle");dirty=true}
 let XS=null;function homeX(){const t=G.state==="title";if(XS===t)return;XS=t;btn.style.display=t?"none":"";sbtn.style.right=t?"12px":""}
 function openHelp(){HT.open=1;G.tHold=1;sfx("toggle");track("how to play");dirty=true}
 /* a short card: the three moves, the four power-ups, and keys; nothing about what lies beyond the vault */
@@ -848,7 +853,7 @@ function world(vx,sx,sy){const x=ctx;VX=vx;const z=zoom(),e=Math.round((sx-G.cam
   const k=Math.floor(G.dist/ZL)+1,L=G.objs.slice();if(!W4)for(const kk of[k-1,k]){const z=kk*ZL-G.dist;if(kk>0&&kk*ZL<=BRK&&z>ZMIN-1&&z<FAR)L.push({t:"gate",k:kk,z})}
   L.sort((a,b)=>b.z-a.z);let pl=false;x.imageSmoothingEnabled=true;
   for(const o of L){if(!pl&&o.z<0){drawPlayer();pl=true}drawObj(o)}if(!pl)drawPlayer();if(W4){wfx();rivalFlag();drawMarks()}/* out in the woods it goes over the light of the hour, so it shows at night */if(vx)motes();VX=false}
-function draw(){const t0=performance.now(),x=ctx;let sx=0,sy=0;if(G.snap){G.snap=0;shat()}
+function draw(){const t0=performance.now(),x=ctx;let sx=0,sy=0;if(G.state==="room"){drawRoom();if(HOME&&btn)homeX();G.frames++;G.ms+=performance.now()-t0;return}if(G.snap){G.snap=0;shat()}
   if(G.state==="over"&&G.hitT<.3){const a=(.3-G.hitT)*12;sx=Math.round((Math.random()-.5)*a);sy=Math.round((Math.random()-.5)*a)}
   x.setTransform(1,0,0,1,0,0);if(sx||sy){x.fillStyle=PAPER;x.fillRect(0,0,gc.width,gc.height)}
   const V=G.vox>0;
@@ -863,6 +868,7 @@ function draw(){const t0=performance.now(),x=ctx;let sx=0,sy=0;if(G.snap){G.snap
   if(G.state==="title"&&WSEEN)titleLeaf();
   if(!REDUCED&&G.fxT<.8)burstFx(sx);
   if(V&&!(G.vtr>0)&&!REDUCED)shine();
+  if(G.fin>0&&G.state==="run"){x.fillStyle="rgba(5,6,8,"+Math.min(1,G.fin/.8)+")";x.fillRect(0,0,gc.width,gc.height)}/* back from the room */
   if(G.freeze>0){x.globalAlpha=G.freeze/.11*.5;x.fillStyle=WHITE;x.fillRect(0,0,gc.width,gc.height);x.globalAlpha=1}/* hit flash */
   if(G.zone===4&&G.wt<4.3&&G.state!=="title")drawWoodsCard();
   drawPops();if(G.state!=="title")hud();
@@ -873,30 +879,139 @@ function draw(){const t0=performance.now(),x=ctx;let sx=0,sy=0;if(G.snap){G.snap
   if(FPSM)drawFps();
   G.frames++;G.ms+=performance.now()-t0}
 
+/* ---------- the room that runs the game ----------
+   In the mailroom there is a door, left a little open, that blends into the wall. Push him into it (left, when he's already
+   in the left lane) and the run stops. Inside: server racks, a desk of monitors, and one screen as big as the far wall
+   showing the hall he was just in. He walks with the same moves he runs with (up and down to walk, left and right to step),
+   and every input lands on the monitors as it happens. At the desk the whole run plays back, every move of it, and he
+   understands. Then he walks out (keep pressing down) and the run carries on exactly where it was. No words but one line,
+   no score while you're in there, and nothing is counted anywhere. */
+const DOOR_A=440,RXW=2.45,RZB=4.9,RZR=[.35,1.75,3.1],RDK=3.6,ROOM={bg:"#121519",floor:"#1A1E23",grid:"#232930",wall:"#15191D",rack:"#22282F",unit:"#2B323A",face:"#191D22"};
+let ROOMSEEN=store("vk_run_room")==="1",SNAP=null;const R={};
+const doorZ=()=>DOOR_A-G.dist,doorOn=()=>!G.lap&&!G.rmUsed&&G.state==="run";
+function doorNear(){const z=doorZ();return doorOn()&&G.jy<20&&z>-2.2&&z<4.8}
+/* keep the left lane clear for a few metres either side of the door, so getting in is about noticing it, not dodging */
+function doorClear(n0){if(G.lap||G.rmUsed)return;for(let i=G.objs.length-1;i>=n0;i--){const o=G.objs[i],a=G.dist+o.z;if((o.t==="cab"||o.t==="stack"||o.t==="sign")&&o.lane===-1&&a>DOOR_A-16&&a<DOOR_A+5)G.objs.splice(i,1)}}
+/* the door, on the left wall: the same paint as the wall, a thin frame, and a cold sliver of light where it's left open */
+function drawDoor(Z){if(G.lap||G.zone)return;const z=doorZ();if(z<ZMIN-2||z>FAR-4)return;const H=HC,a=z,b=z+2.3,sg=-1,top=H*.4,fa=z>FAR-20?Math.max(0,(FAR-4-z)/16):1;
+  ctx.globalAlpha=fa;ctx.fillStyle=Z.line;wq(sg,a-.14,b+.14,0,top+2.2);ctx.fillStyle="#E9E6DD";wq(sg,a,b,0,top);ctx.fillStyle="#DEDACF";wq(sg,a+.12,b-.12,H*.05,H*.17);wq(sg,a+.12,b-.12,H*.22,top-H*.04);
+  ctx.fillStyle=Z.line;wq(sg,b-.36,b-.24,H*.18,H*.2);/* the handle */
+  if(!G.rmUsed){const f=.6+.3*Math.sin(G.t*7.3)*Math.sin(G.t*2.1);ctx.fillStyle=INK;wq(sg,a-.03,a+.3,.4,top-.4);/* left open a crack, cold light inside */
+    ctx.globalAlpha=fa*f;ctx.fillStyle="#9CC2EE";wq(sg,a+.04,a+.2,1,top-1);
+    ctx.globalAlpha=fa*f*.6;ctx.fillStyle="#8FB4E6";const qa=qz(Math.max(a-.4,ZMIN-1)),qb=qz(a+1.6),xa=CX-WX*LW*qa,xb=CX-WX*LW*qb;ctx.beginPath();ctx.moveTo(xa,fY(qa));ctx.lineTo(xa+LW*.95*qa,fY(qa));ctx.lineTo(xb,fY(qb));ctx.fill()}/* light spilling across the floor */
+  ctx.globalAlpha=1}
+/* how close the door is, for its hum */
+const doorHum=()=>{if(!doorOn())return 0;const z=doorZ();return z<-3||z>34?0:Math.pow(1-Math.abs(z)/34,2)};
+function snapHall(){const c=mk(gc.width,gc.height),o=ctx;ctx=c.getContext("2d");ctx.imageSmoothingQuality="high";G.noPl=1;
+  try{world(G.vox>0,0,0);ctx.setTransform(1,0,0,1,0,0);hud()}catch(e){}G.noPl=0;ctx=o;return c}
+function enterRoom(){SNAP=snapHall();G.rmUsed=1;G.state="room";Object.assign(R,{t:0,l:0,r:0,rx:0,rz:-.9,face:0,walk:0,last:0,rep:-1,know:0,gl:0,out:-1,ml:G.lane,mx:G.lane,mj:0,ms:0,mg:0,flash:-9,seen:G.il.length,wait:0});
+  POP.length=0;sfx("door");dirty=true}
+function exitRoom(){G.state="run";G.objs=G.objs.filter(o=>!(o.z<26&&(o.t==="cab"||o.t==="stack"||o.t==="sign")));G.lane=-1;G.x=-1;G.fin=.8;G.slide=0;G.jy=0;G.vy=0;SNAP=null;sfx("doorOut");dirty=true}
+function roomAct(a){if(a==="pause"||R.out>=0)return;const c=a==="left"?0:a==="right"?1:a==="down"?3:a==="up"||a==="go"?2:-1;if(c<0)return;
+  G.il.push(c);if(G.il.length>600)G.il.shift();R.last=R.t;R.flash=R.t;R.wait=0;R.gl=0;sfx("relay",c);
+  /* the runner on the big screen does what you tell it, too */
+  if(c===0)R.ml=Math.max(-1,R.ml-1);else if(c===1)R.ml=Math.min(1,R.ml+1);else if(c===2&&!R.mj)R.mj=.001;else if(c===3)R.ms=.6;
+  if(c===0)R.l=Math.max(-1,R.l-1);else if(c===1)R.l=Math.min(1,R.l+1);
+  else if(c===2){R.face=0;if(R.r<2)R.r++}
+  else{R.face=1;if(R.r>0)R.r--;else if(Math.abs(R.rz-RZR[0])<.2)R.out=0}}
+function roomUpdate(dt){R.t+=dt;const tz=R.out>=0?-1.6:RZR[R.r],sp=1.9*dt,ox=R.rx,oz=R.rz;
+  R.rx+=Math.max(-sp*1.2,Math.min(sp*1.2,R.l-R.rx));R.rz+=Math.max(-sp,Math.min(sp,tz-R.rz));const mv=Math.abs(R.rx-ox)+Math.abs(R.rz-oz)>1e-4;
+  if(mv){R.walk+=dt;if((R.walk*4.2|0)!==((R.walk-dt)*4.2|0))sfx("rstep",R.rx)}
+  R.mx+=(R.ml-R.mx)*Math.min(1,dt*14);if(R.mj>0){R.mj+=dt;if(R.mj>.6)R.mj=0}if(R.ms>0)R.ms-=dt;
+  if(R.out>=0){R.out+=dt;if(R.out>.95)exitRoom();return}
+  /* standing at the desk for the first time: the whole run plays back on the monitors */
+  if(R.r===2&&R.rep<0&&Math.abs(R.rz-RZR[2])<.05){R.rep=0;sfx("replay",G.il.length)}
+  if(R.rep>=0&&!R.know){R.rep+=dt;if(R.rep>3.4){R.know=1;R.gl=1.9;if(!ROOMSEEN){ROOMSEEN=true;store("vk_run_room",1)}sfx("know")}}
+  if(R.gl>0)R.gl-=dt;
+  if(!R.wait&&R.t-R.last>6){R.wait=1;sfx("wait")}}
+/* a side wall of the room, like wq for the hall */
+function rq(sg,za,zb,h1,h2){za=Math.max(za,ZMIN-1);if(zb<=za)return;const qa=qz(za),qb=qz(zb),xa=CX+sg*RXW*LW*qa,xb=CX+sg*RXW*LW*qb,fa=fY(qa),fb=fY(qb);
+  ctx.beginPath();ctx.moveTo(xa,fa-h1*qa);ctx.lineTo(xa,fa-h2*qa);ctx.lineTo(xb,fb-h2*qb);ctx.lineTo(xb,fb-h1*qb);ctx.fill()}
+/* tiny arrows: left, right, up, down */
+function arrow(c,x,y,s,col){ctx.fillStyle=col;const m=c===0?[[0,0,1,0,0],[0,1,1,0,0],[1,1,1,1,1],[0,1,1,0,0],[0,0,1,0,0]]:c===1?[[0,0,1,0,0],[0,0,1,1,0],[1,1,1,1,1],[0,0,1,1,0],[0,0,1,0,0]]:c===2?[[0,0,1,0,0],[0,1,1,1,0],[1,0,1,0,1],[0,0,1,0,0],[0,0,1,0,0]]:[[0,0,1,0,0],[0,0,1,0,0],[1,0,1,0,1],[0,1,1,1,0],[0,0,1,0,0]];
+  for(let j=0;j<5;j++)for(let i=0;i<5;i++)if(m[j][i])ctx.fillRect(x+i*s,y+j*s,s,s)}
+const hh=v=>{const t=Math.sin(v*12.9898)*43758.5453;return t-Math.floor(t)};
+function drawRoom(){const x=ctx,t=R.t,H=HC,px=1/SS,sn=v=>Math.round(v*SS)/SS;x.setTransform(SS,0,0,SS,0,0);x.imageSmoothingEnabled=false;
+  const qb=qz(RZB),bx=RXW*LW*qb,by0=cY(qb),by1=fY(qb);
+  x.fillStyle=ROOM.bg;x.fillRect(0,0,iw,ih);
+  /* on a phone held upright the room is framed closer, so the screen and him fill it */const pz=ih>iw*1.2?1.22:1;if(pz>1)x.setTransform(SS*pz,0,0,SS*pz,SS*CX*(1-pz),SS*(ih*.42-(by0+by1)/2*pz));
+  /* floor, with a grid that runs to the far wall */
+  x.fillStyle=ROOM.floor;x.beginPath();const qn=qz(ZMIN-1);x.moveTo(CX-bx,by1);x.lineTo(CX+bx,by1);x.lineTo(CX+RXW*LW*qn,fY(qn));x.lineTo(CX-RXW*LW*qn,fY(qn));x.fill();
+  x.fillStyle=ROOM.grid;for(let z=Math.ceil(ZMIN);z<RZB;z+=.8){const q=qz(z);x.fillRect(CX-RXW*LW*q,sn(fY(q)),RXW*LW*q*2,px)}
+  for(let k=-2;k<=2;k++){const l=k*RXW/2.5;x.beginPath();x.moveTo(CX+l*LW*qb,by1);x.lineTo(CX+l*LW*qn+px,fY(qn));x.lineTo(CX+l*LW*qn-px,fY(qn));x.fill()}
+  /* the far wall is one screen, showing the hall he was just in */
+  x.fillStyle=ROOM.wall;x.fillRect(CX-bx,by0,bx*2,by1-by0);
+  const sw=bx*2*.94,sh0=(by1-by0)*.86,sxl=CX-sw/2,syt=by0+(by1-by0)*.05;x.fillStyle=INK;x.fillRect(sxl-2,syt-2,sw+4,sh0+4);
+  const fl=R.rep>=0&&!R.know?(hh(t*30|0)<.3?.55:1):hh(t*9|0)<.04?.8:1;
+  if(SNAP){const ca=sw/sh0,cw=Math.min(iw,ih*ca),ch=cw/ca,cx0=CX-cw/2,cy0=Math.max(0,Math.min(ih-ch,GY-ch*.8)),k=sw/cw;
+    x.imageSmoothingEnabled=true;x.globalAlpha=fl;x.drawImage(SNAP,cx0*SS,cy0*SS,cw*SS,ch*SS,sxl,syt,sw,sh0);x.globalAlpha=1;
+    /* the runner on the screen, doing what you do */
+    const mjy=R.mj>0?Math.sin(R.mj/.6*Math.PI)*34:0,nm=R.gl>0?"gl":R.ms>0?"slide":R.mj>0?"jump":((t*8)|0)&1?"runA":"runB",mxp=sxl+(CX+R.mx*LW-cx0)*k,myp=syt+(GY-mjy-cy0)*k;
+    x.save();x.beginPath();x.rect(sxl,syt,sw,sh0);x.clip();blit(SP.sh,mxp,syt+(GY+3-cy0)*k,P0*k);blit(SP[nm],mxp,myp,P0*k);
+    x.fillStyle="rgba(14,30,70,.42)";x.fillRect(sxl,syt,sw,sh0);x.fillStyle="rgba(90,150,255,.1)";x.fillRect(sxl,syt,sw,sh0);x.fillStyle="rgba(0,0,0,.22)";for(let y=syt;y<syt+sh0;y+=2)x.fillRect(sxl,y,sw,px*Math.max(1,SS/2));
+    const ry=syt+((t*.25)%1)*sh0;x.fillStyle="rgba(255,255,255,.05)";x.fillRect(sxl,ry,sw,sh0*.06);x.restore()}
+  /* ceiling and its cable trays */
+  x.fillStyle="#0E1114";x.beginPath();x.moveTo(CX-bx,by0);x.lineTo(CX+bx,by0);const qt=Math.min(qn,(HY+2)/(HC-(GY-HY)));x.lineTo(CX+RXW*LW*qt,cY(qt));x.lineTo(CX-RXW*LW*qt,cY(qt));x.fill();
+  x.fillStyle="#1D2227";for(const l of[-1.5,1.5]){x.beginPath();x.moveTo(CX+l*LW*qb-1,by0);x.lineTo(CX+l*LW*qb+1,by0);x.lineTo(CX+l*LW*qt+2,cY(qt));x.lineTo(CX+l*LW*qt-2,cY(qt));x.fill()}
+  /* server racks down both walls, every light doing its own thing */
+  for(const sg of[-1,1]){x.fillStyle=ROOM.wall;rq(sg,ZMIN-1,RZB,0,H*1.02);
+    for(let k=0;k<4;k++){const za=.15+k*1.18,zb=za+1.05;x.fillStyle=ROOM.rack;rq(sg,za,zb,0,H*.62);x.fillStyle=ROOM.face;rq(sg,za+.07,zb-.07,H*.03,H*.6);
+      for(let u=0;u<13;u++){const h1=H*(.05+u*.042);x.fillStyle=ROOM.unit;rq(sg,za+.07,zb-.07,h1,h1+px*1.2);
+        for(let c=0;c<5;c++){const r=hh(k*91+u*7+c*3+sg*.5),rate=1+r*5,on=hh(r*77+((t*rate)|0))>(r>.8?.2:.55);if(!on)continue;
+          x.fillStyle=r<.55?"#3CDC78":r<.75?"#F0B43C":r<.85?"#5AA0FF":RED;const a=za+.18+c*.15+r*.04;rq(sg,a,a+.06,h1+H*.012,h1+H*.022)}}}
+    x.fillStyle="#0B0D10";for(let k=0;k<5;k++){const z=.1+k*1.18;rq(sg,z,z+.05,H*.62,H*1.02)}}
+  /* the desk and its monitors */
+  const qd=qz(RDK),qd2=qz(RDK+.6),dw=RXW*.92,dh=H*.11;
+  x.fillStyle="#262C33";x.beginPath();x.moveTo(CX-dw*LW*qd,fY(qd)-dh*qd);x.lineTo(CX+dw*LW*qd,fY(qd)-dh*qd);x.lineTo(CX+dw*LW*qd2,fY(qd2)-dh*qd2);x.lineTo(CX-dw*LW*qd2,fY(qd2)-dh*qd2);x.fill();
+  x.fillStyle="#1B2025";x.fillRect(CX-dw*LW*qd,fY(qd)-dh*qd,dw*LW*qd*2,dh*qd);x.fillStyle="#30373F";x.fillRect(CX-dw*LW*qd,fY(qd)-dh*qd,dw*LW*qd*2,px*1.5);
+  const zm=RDK+.32,qm=qz(zm),mw=LW*.62*qm,mh=H*.085*qm,my=fY(qm)-dh*qm-mh-H*.012*qm,s1=Math.max(px,Math.round(mh/9*SS)/SS);
+  const LOG=G.il,n=LOG.length,rp=R.rep>=0&&!R.know?Math.min(1,R.rep/3.2):1,shown=Math.floor(n*rp);
+  [-1.55,-.78,.78,1.55].forEach((l,i)=>{const mx=CX+l*LW*qm-mw/2;x.fillStyle=INK;x.fillRect(mx-px*2,my-px*2,mw+px*4,mh+px*4);x.fillRect(CX+l*LW*qm-px*2,my+mh,px*4,H*.012*qm+px);
+    x.fillStyle="#0B1A12";x.fillRect(mx,my,mw,mh);const g=R.t-R.flash<.18?"#E8FFF0":"#3CDC78";
+    if(i<2){/* the inputs, newest at the bottom; at the desk the whole run scrolls past */const rows=Math.max(1,Math.floor((mh-s1)/(s1*7))),cols=Math.max(1,Math.floor((mw-s1)/(s1*7))),per=rows*cols,end=i===0?shown:Math.max(0,shown-per);
+      for(let j=0;j<per;j++){const idx=end-per+j+(i===0?0:0);if(idx<0||idx>=n)continue;const cc=j%cols,rr=j/cols|0;arrow(LOG[idx],mx+s1+cc*s1*7,my+s1+rr*s1*7,s1,idx>=n-1&&R.t-R.flash<.3?"#E8FFF0":idx>=R.seen?"#9CFFC0":"#2E9E5A")}}
+    else if(i===2){const v=String(Math.min(n,shown)).padStart(4,"0");text(x,v,mx+(mw-tw(v,s1))/2,my+(mh-5*s1)/2,s1,g)}
+    else{x.fillStyle="#3CDC78";for(let k2=0;k2<mw/px/2;k2++){const yy=Math.sin(k2*.5+t*6)*Math.sin(k2*.13+t)*(R.t-R.flash<.4?1:.35);x.fillRect(mx+k2*px*2,my+mh/2+yy*mh*.4,px*2,px)}}});
+  x.fillStyle="#2A3036";x.fillRect(CX-LW*.45*qm,fY(qm)-dh*qm-px*2,LW*.9*qm,px*2);/* keyboard */
+  /* the glow of the big screen over the floor and the desk */
+  const gr=x.createLinearGradient(0,by1,0,ih);gr.addColorStop(0,"rgba(120,170,240,.13)");gr.addColorStop(1,"rgba(120,170,240,0)");x.fillStyle=gr;x.fillRect(CX-bx*1.6,by1,bx*3.2,ih-by1);
+  /* him */
+  const q=qz(R.rz),rx=CX+R.rx*LW*q+(R.know&&R.gl<=0&&R.out<0&&hh((t*20)|0)<.12?(hh(t)<.5?-px:px):0),ry=fY(q),moving=Math.abs(R.l-R.rx)>.02||Math.abs((R.out>=0?-1.6:RZR[R.r])-R.rz)>.02;
+  const fr=R.face||R.out>=0,kn=R.know?"k":"n",nm=R.gl>0&&!moving?"gl":fr?(moving?(((R.walk*4.2)|0)&1?"fa"+kn:"fb"+kn):"f0"+kn):moving?(((R.walk*4.2)|0)&1?"runA":"runB"):"idle";
+  blit(SP.sh,rx,ry+P0*q,P0*q);blit(SP[nm],rx,ry-(moving&&((R.walk*4.2|0)&1)?q:0),P0*q);
+  /* one line, only if you leave him standing there */
+  if(R.wait&&R.out<0&&((t*1.6)|0)%2===0){const s=Math.max(1,Math.round(sw/120*SS)/SS),m="WAITING FOR INPUT",w=tw(m,s);x.fillStyle="rgba(0,0,0,.55)";x.fillRect(CX-w/2-s*3,syt+sh0*.42-s*3,w+s*6+s*4,s*11);text(x,m,CX-w/2,syt+sh0*.42,s,"#E8F0FF");x.fillStyle="#E8F0FF";x.fillRect(CX+w/2+s*2,syt+sh0*.42,s*3,s*5)}
+  /* in and out through the dark */
+  const fa=R.out>=0?Math.min(1,R.out/.85):Math.max(0,1-R.t/.9);if(fa>0){x.setTransform(1,0,0,1,0,0);x.fillStyle="rgba(5,6,8,"+fa+")";x.fillRect(0,0,gc.width,gc.height)}
+  x.setTransform(1,0,0,1,0,0)}
+/* on the title screen, once you've been in: now and then he looks back at you, and can't quite keep still */
+const titleGl=(e)=>{if(!ROOMSEEN||G.state!=="title")return false;const p=performance.now()/1000%9;return p>5.6+(e||0)&&p<7.4-(e||0)};
 /* ---------- loop: draws every frame while running, otherwise only when something changes ---------- */
 function frame(t){raf=requestAnimationFrame(frame);if(VQ.length&&G.state==="run")voxStep(2);if(G.state==="run"&&G.zone!==4&&G.dist>BRK-600)wprep(false,false);
-  if(G.state==="title"&&(WSEEN&&performance.now()/1000%11<5.1||tPhase().p<1||TB.msg&&performance.now()-TB.t<2700))dirty=true;const dt=last?Math.min(.05,(t-last)/1000):0;last=t;if(G.state==="run"&&dt>0)fpsNote(dt);
+  if(G.state==="title"&&(WSEEN&&performance.now()/1000%11<5.1||titleGl(-.1)||tPhase().p<1||TB.msg&&performance.now()-TB.t<2700))dirty=true;const dt=last?Math.min(.05,(t-last)/1000):0;last=t;if(G.state==="run"&&dt>0)fpsNote(dt);
   G.boilT+=dt;if(G.boilT>=BOIL){G.boilT%=BOIL;G.boil=(G.boil+1)%3;dirty=true}
-  if(G.state==="run"&&G.freeze>0){G.freeze-=dt;dirty=true}
+  if(G.state==="room"){roomUpdate(dt);dirty=true}
+  else if(G.state==="run"&&G.freeze>0){G.freeze-=dt;dirty=true}
   else if(G.state==="run"){let d2=dt;if(G.slo>0){const k=G.slo/SLO;G.slo=Math.max(0,G.slo-dt);d2=dt*(.28+.72*(1-k)*(1-k))}/* time slows as you cross over, then catches up */
-    const n=Math.max(1,Math.ceil(d2/.017)),h=d2/n;for(let i=0;i<n&&G.state==="run";i++)update(h);dirty=true}
+    if(G.fin>0)G.fin-=dt;const n=Math.max(1,Math.ceil(d2/.017)),h=d2/n;for(let i=0;i<n&&G.state==="run";i++)update(h);dirty=true}
   else if(G.state==="over"){if(G.freeze>0)G.freeze-=dt;else G.hitT+=dt;if(G.hitT<.8)dirty=true;if(!G.ovs&&G.hitT>.45){G.ovs=1;sfx("over",G.newBest)}if(G.ph==="card"&&G.hitT>1.9)lbNext()}
   if(G.state!=="pause"&&POP.length){for(const p of POP)p.a+=dt;while(POP.length&&POP[0].a>.9)POP.shift();POP.forEach((p,i)=>p.row=i);dirty=true}
-  if(SND&&window.VKAudio){TK.state=G.state;TK.zone=G.zone;TK.vox=G.vox>0;TK.sp=Math.min(1,Math.max(0,(G.speed-V0)/(VMAX-V0)));TK.x=G.x;TK.mult=G.mult;TK.slo=G.slo;TK.boost=G.boost>0;TK.night=G.zone===4?WT.night:0;VKAudio.tick(TK)}/* the music follows the run */
+  if(SND&&window.VKAudio){TK.state=G.state;TK.zone=G.zone;TK.vox=G.vox>0;TK.sp=Math.min(1,Math.max(0,(G.speed-V0)/(VMAX-V0)));TK.x=G.x;TK.mult=G.mult;TK.slo=G.slo;TK.boost=G.boost>0;TK.night=G.zone===4?WT.night:0;TK.door=doorHum();VKAudio.tick(TK)}/* the music follows the run */
   if(dirty){dirty=false;draw()}}
 
 /* ---------- input ---------- */
 function act(a){if(busy)return;if(HT.open){HT.open=0;dirty=true;return}if(a==="help"||a==="invite"){if(G.state==="title"&&HOME)(a==="help"?openHelp:doInvite)();return}
   if(G.state==="title"&&(a==="left"||a==="right"||a==="down")){G.tHold=1;dirty=true}if(a==="close"){if(!HOME)close();else if(G.state!=="title")goHome();return}if(a==="sound")return toggleSound();if(a==="share"){if(G.state==="over"&&G.ph!=="name"&&G.hitT>.6)doShare();return}if(SND){loadAudio();const A=AU();if(A)A.unlock()}
+  if(G.state==="room")return roomAct(a);
   if(G.state==="title"){if(a==="go"||a==="up")start();return}
   if(G.state==="over"){if(G.ph==="name"){if(a==="go")namePress();else if(a==="left")nameMove(-1,0);else if(a==="right")nameMove(1,0);else if(a==="up")nameMove(0,-1);else if(a==="down")nameMove(0,1);return}
     if((a==="go"||a==="up")&&G.hitT>.6){if(G.ph==="card"&&LB.on&&lbQual(G.score)&&!G.auto)lbNext();else start()}return}
   if(G.state==="pause"){if(a==="go"||a==="up"||a==="pause"){G.state="run";sfx("resume");dirty=true}return}
   if(a==="pause"){G.state="pause";sfx("pause");dirty=true}
-  else if(a==="left"){if(G.lane>-1){G.lane--;sfx("lane",-1)}}
-  else if(a==="right"){if(G.lane<1){G.lane++;sfx("lane",1)}}
-  else if(a==="up"||a==="go")G.jbuf=.14;
-  else if(a==="down"){if(G.jy>0){G.vy=-FALL_V;G.sbuf=1}else{if(!(G.slide>0)){G.sq=-.35;sfx("slide");burst()}G.slide=SLIDE_T;G.sl0=G.t;G.jbuf=0}}}
+  else if(a==="left"){if(G.il)G.il.push(0);if(G.lane>-1){G.lane--;sfx("lane",-1)}else if(doorNear())enterRoom()}
+  else if(a==="right"){if(G.il)G.il.push(1);if(G.lane<1){G.lane++;sfx("lane",1)}}
+  else if(a==="up"||a==="go"){if(G.il)G.il.push(2);G.jbuf=.14}
+  else if(a==="down"){if(G.il)G.il.push(3);if(G.jy>0){G.vy=-FALL_V;G.sbuf=1}else{if(!(G.slide>0)){G.sq=-.35;sfx("slide");burst()}G.slide=SLIDE_T;G.sl0=G.t;G.jbuf=0}}}
 const KEYS={ArrowLeft:"left",KeyA:"left",ArrowRight:"right",KeyD:"right",ArrowUp:"up",KeyW:"up",Space:"go",Enter:"go",ArrowDown:"down",KeyS:"down",Escape:"close",KeyP:"pause",KeyM:"sound",KeyC:"share",KeyH:"help",KeyI:"invite"};
 function onKey(e){if(G.state==="over"&&G.ph==="name"&&!busy&&nameKey(e)){e.preventDefault();e.stopPropagation();return}if(HT.open&&!e.repeat){e.preventDefault();e.stopPropagation();HT.open=0;dirty=true;return}const a=KEYS[e.code]||(e.key==="Escape"?"close":null);e.stopPropagation();if(a||e.key==="Tab")e.preventDefault();if(!a||(e.repeat&&a!=="close"))return;act(a)}
 function onDown(e){if(e.target.closest&&e.target.closest("button"))return;p0={x:e.clientX,y:e.clientY,done:false,home:HB.live};e.preventDefault()}
@@ -950,5 +1065,5 @@ function close(){if(!root||busy)return;busy=true;cancelAnimationFrame(raf);raf=0
   dctx.clearRect(0,0,dc.width,dc.height);dctx.drawImage(gc,0,0);dc.style.display="block";root.classList.remove("on");document.documentElement.classList.remove("vkg-lock");
   blocks(cells(),240,c=>dctx.clearRect(c[0],c[1],CELL*SS,CELL*SS),done)}
 
-window.VKGame={open,close,get running(){return !!raf},get state(){return root?G.state:"closed"},stats:()=>({frames:G.frames,ms:G.ms,iw,ih}),_G:G,_draw:()=>draw(),_pop:pop,_SP:SP,_sprites:sprites,_voxPrep:voxPrep,_cells:()=>{VC=wave(true)},_LB:LB,_share:()=>shareText(),_CH:CH,help(){if(!root)open();HT.open=1;G.tHold=1;dirty=true},invite:cb=>doInvite(cb),_invite:()=>inviteText(),_SETS:SETS,_step:h=>update(h)};
+window.VKGame={open,close,get running(){return !!raf},get state(){return root?G.state:"closed"},stats:()=>({frames:G.frames,ms:G.ms,iw,ih}),_G:G,_draw:()=>draw(),_pop:pop,_SP:SP,_sprites:sprites,_voxPrep:voxPrep,_cells:()=>{VC=wave(true)},_LB:LB,_share:()=>shareText(),_CH:CH,help(){if(!root)open();HT.open=1;G.tHold=1;dirty=true},invite:cb=>doInvite(cb),_invite:()=>inviteText(),_SETS:SETS,_step:h=>update(h),_R:R,_room:()=>enterRoom()};
 })();
