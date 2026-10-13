@@ -14,7 +14,7 @@ const REDUCED=matchMedia("(prefers-reduced-motion: reduce)").matches;
 const TOUCH=matchMedia("(pointer: coarse)").matches;
 
 /* ---------- tuning ---------- */
-const SLO=.75,VTR=.55,D=6,FAR=64,SPAWN=62,V0=13,VMAX=27,ACC=0.011,GRAV=760,JUMP_V=230,FALL_V=420,SLIDE_T=0.62,CLEAR=18,P0=2,WX=1.85,SIGN_UP=27,BOIL=0.16,CELL=10;
+const STREAK_M=150,SLO=.75,VTR=.55,D=6,FAR=64,SPAWN=62,V0=13,VMAX=27,ACC=0.011,GRAV=760,JUMP_V=230,FALL_V=420,SLIDE_T=0.62,CLEAR=18,P0=2,WX=1.85,SIGN_UP=27,BOIL=0.16,CELL=10;
 let SS=2,UC=2,CPX=1,HS=4;/* canvas pixels per world pixel, and per pixel of on-screen text */
 
 /* ---------- zones: every 500 m the hallway changes; the vault door opens at 2,000 m, then it loops ---------- */
@@ -405,7 +405,14 @@ const FPSM=/[?&]fps\b/.test(location.search),FT=[],FA=[];let FPS1=0;
 function fpsNote(dt){FT.push(dt);if(FT.length>60)FT.shift();if(FPS1)return;FA.push(dt);
   if(FA.length>=600){FPS1=1;const a=FA.sort((x,y)=>x-y),b=v=>String(Math.min(120,Math.round(1/v/5)*5));track("fps",{typical:b(a[a.length>>1]),worst5pct:b(a[Math.floor(a.length*.95)]),device:TOUCH?"phone":"desktop"})}}
 function drawFps(){if(!FT.length)return;const s=Math.round(FT.length/FT.reduce((a,b)=>a+b,0))+" FPS",k=Math.max(1,Math.round(HS*.6));text(ctx,s,HS*3,gc.height-HS*6,k,RED)}
-function lbNext(){if(lbQual(G.score))toName();else nameSkip()}
+function lbNext(){if(G.auto)toBoard();else if(lbQual(G.score))toName();else nameSkip()}
+/* once you've signed the board, later runs that make it are signed for you the moment they end,
+   so the card can offer RUN AGAIN straight away (the save carries on in the background, and is queued if it can't get through) */
+function autoSave(){const n=(store("vk_run_name")||"").replace(/[^A-Z0-9]/g,"").slice(0,NL),s=G.score,rid=G.rid;if(!n||!lbQual(s))return false;
+  const body={n,s,ms:Math.round(G.t*1000),k:G.keys,id:rid,w:G.woods?1:0},keep=()=>pqSet(PQ().filter(e=>e.id!==body.id).concat([body]));LB.me={n,s,w:body.w,rank:0,saved:false,q:1};
+  fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(r=>r.json().catch(()=>null).then(j=>({ok:r.ok,j}))).then(({ok,j})=>{
+    if(ok&&j&&Array.isArray(j.top)){lbTake(j);if(j.saved){mineAdd(n,s);track("signed",{rank:j.rank<=10?"top 10":"board"})}passCheck();if(G.rid===rid&&G.state==="over")LB.me={n,s,w:body.w,rank:j.rank||0,saved:!!j.saved};dirty=true}
+    else{const er=j&&j.error;if(er!=="word"&&er!=="score")keep()}}).catch(keep);return true}
 function toName(){G.ph="name";LB.name=(store("vk_run_name")||"").replace(/[^A-Z0-9]/g,"").slice(0,NL);LB.gy=LB.name?4:0;LB.gx=LB.name?7:0;LB.msg="";LB.busy=false;dirty=true}
 function toBoard(){G.ph="board";LB.rv=performance.now();dirty=true}
 function nameSkip(){LB.me={n:"",s:G.score,rank:0,saved:false};toBoard()}
@@ -508,13 +515,51 @@ function drawBoard(att){const w=170,top=LB.top.slice(0,10),me=att?null:LB.me,R0=
 /* ---------- game ---------- */
 function start(){LB.me=null;SHAT=null;if(LB.passOk){LB.pass="";seenSet();cards.t=null}
   RUNS++;if(RUNS===1)track("play",{from:CH?"challenge link":"direct",device:TOUCH?"phone":"desktop"});else if(RUNS===5||RUNS===20)track("runs "+RUNS+"+");
-  Object.assign(G,{state:"run",ph:"card",rid:Math.random().toString(36).slice(2,10),t:0,dist:0,speed:V0,keys:0,lane:0,x:0,jy:0,vy:0,slide:0,sbuf:0,jbuf:0,anim:0,next:-36,pop:0,step:0,mult:1,maxMult:1,kpts:0,bonus:0,near:0,sq:0,freeze:0,sl0:-9,passedBest:false,trs:{},mag:0,boost:0,shield:0,grace:0,nextPU:rr(150,230),zone:0,zprev:0,zf:9,lap:0,vk:0,vox:0,vtr:0,slo:0,fxT:9,woods:0,beatCh:0,brk:9,wt:9,snap:0,deer:0,ck:0,lb10:LB.on&&LB.top.length>=10?LB.top[9].s:0,lb1:LB.on&&LB.top.length?LB.top[0].s:0,mk10:0,mk1:0,mkD10:0,mkD1:0});G.objs.length=0;POP.length=0;for(const p of PT)p.t=p.life=0;
+  Object.assign(G,{state:"run",ph:"card",rid:Math.random().toString(36).slice(2,10),t:0,dist:0,speed:V0,keys:0,lane:0,x:0,jy:0,vy:0,slide:0,sbuf:0,jbuf:0,anim:0,next:-36,pop:0,step:0,mult:1,maxMult:1,kpts:0,bonus:0,near:0,sq:0,freeze:0,sl0:-9,passedBest:false,trs:{},mag:0,boost:0,shield:0,grace:0,nextPU:rr(150,230),zone:0,zprev:0,zf:9,lap:0,vk:0,vox:0,vtr:0,slo:0,fxT:9,woods:0,beatCh:0,brk:9,wt:9,snap:0,deer:0,ck:0,lk:0,pq:[],pn:0,lb10:LB.on&&LB.top.length>=10?LB.top[9].s:0,lb1:LB.on&&LB.top.length?LB.top[0].s:0,mk10:0,mk1:0,mkD10:0,mkD1:0});G.objs.length=0;POP.length=0;for(const p of PT)p.t=p.life=0;
   while(G.next<=0){row(SPAWN+G.next);G.next+=gap()}sfx("start");dirty=true}
 const gap=()=>Math.max(8,G.speed*.6)+Math.random()*6;
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+/* ---------- set pieces: short, deliberately timed sequences, a few for each room ----------
+   Each string is one row of the hallway, read left lane / middle / right, one row per beat (about two-thirds of a second).
+   C = something tall to go round   J = something low to jump   S = something hanging to slide under   . = clear
+   k = a row of keys in a clear lane   j / s = keys over a jump / under a slide: the harder line pays more
+   Every set piece ends with a clear row to breathe. tests/fair.mjs checks that each one can always be got through
+   moving at most one lane per beat. Tier 0 from the start, 1 once you're under way, 2 from the second lap. */
+const SETS=[
+  /* MAILROOM: open, readable, teaches clean lane changes */
+  [[0,"weave",["CCk","CkC","kCC"]],[0,"weave back",["kCC","CkC","CCk"]],[0,"carts",["J.J",".k.","JJJ"]],
+   [1,"sorting",["C.C","CJC","C.C","CSC"]],[1,"the long way",["C.j","C.j","Ck."]],[1,"sacks",["S.S",".S.","SkS"]],
+   [2,"rush hour",["CC.","CJC",".CC","CSC","CC."]]],
+  /* ARCHIVE: jump and slide in rhythm */
+  [[0,"hurdle and duck",["JJJ","...","SSS"]],[0,"shelving",[".J.","SkS",".J."]],
+   [1,"one-two",["JJJ","SSS"]],[1,"stacks",["CSC","CJC","CSC"]],[1,"the paper trail",["s.C","s.C","s.."]],
+   [2,"filing frenzy",["JJJ","SSS","JJJ","...","SSS"]],[2,"aisle",["CJC","CSC","CJC","CSC"]]],
+  /* LOBBY: long sightlines, columns of clocks, read far ahead */
+  [[0,"colonnade",["C.C","CkC","C.C"]],[0,"velvet ropes",["JJ.",".JJ","J.J"]],
+   [1,"the gallery",["C.C","CJC","C.C","CSC","CkC"]],[1,"concierge",["C..",".C.","..C",".C.","C.."]],[1,"chandeliers",["SSS","...","SjS"]],
+   [2,"grand staircase",["CC.","CCJ","CCS","C.C","JCC"]]],
+  /* VAULT: short and hard, then relief and gold */
+  [[0,"bars",["JJJ","...","kkk"]],[1,"lasers",["CJS","...","SCJ","...","kkk"]],[1,"shutters",["SSS","JJJ","...","k.k"]],
+   [2,"the gauntlet",["CJS","SCJ","JSC","...","kkk"]],[2,"lockdown",["CCJ","CCS","CJC","JCC","SCC","k.k"]]],
+  /* THE WOODS: fallen trees and a slalom through the pines */
+  [[0,"deadfall",["JJJ","...","SSS"]],[0,"pines",["C.C",".C.","C.C"]],[1,"thicket",["CJC","CSC","CkC"]],[2,"windfall",["JJJ","SSS","JJJ","SSS"]]]];
+const setChance=()=>G.dist<160?0:G.lap?.62:G.dist<700?.32:.5;
+function setPiece(Zi){const tier=G.lap?2:G.dist>900?1:0,pool=SETS[Zi].filter(e=>e[0]<=tier);if(!pool.length)return null;
+  /* never the same set piece twice in a row */let e;for(let i=0;i<4;i++){e=pool[Math.random()*pool.length|0];if(e[1]!==G.pn)break}G.pn=e[1];return e[2].concat(["..."])}
+function placeRow(r,z,Zi){
+  for(let i=0;i<3;i++){const c=r[i],L=i-1;if(c===".")continue;
+    if(c==="k"||c==="j"||c==="s"){const id=++G.trI;G.trs[id]={got:0,broken:false};for(let k=0;k<5;k++)G.objs.push({t:"key",lane:L,z:z-1+k*1.5,tr:id});if(c==="k")continue}
+    const t=c==="C"?"cab":c==="J"||c==="j"?"stack":"sign";
+    G.objs.push({t,v:t==="cab"?(Math.random()<PCAB[Zi]?"cab":Zi===4&&Math.random()<.5?"pine":VAR[Zi][0]):VAR[Zi][t==="stack"?1:2],lane:L,z})}
+  /* power-ups still turn up, in a clear lane of a set piece's breathing row */
+  const free=[-1,0,1].filter((L,i)=>r[i]===".");
+  if(free.length===3&&G.dist>G.nextPU&&!G.objs.some(o=>o.t==="pu")){const L=free[Math.random()*3|0],k=pickPU();if(k==="vox")voxQueue();G.objs.push({t:"pu",k,lane:L,z});G.nextPU=G.dist+rr(220,360)}}
 function row(z){const A=G.dist+z,ga=A-Math.round(A/ZL)*ZL;if(A>ZL/2&&A<BRK+20&&ga>-6&&ga<10)return;/* nothing in or just behind a doorway */
   if(A>BRK-14&&A<BRK+75){if(A>BRK+12&&Math.random()<.7){const L=[-1,0,1][Math.random()*3|0],id=++G.trI;G.trs[id]={got:0,broken:false};for(let i=0;i<5;i++)G.objs.push({t:"key",lane:L,z:z-1+i*1.5,tr:id})}return}/* the way out is clear: just keys to follow */
-  const Zi=zoneOf(A),W=Zi===4?WOODS.w:ZONES[Zi].w,early=G.dist<120,r=Math.random(),n=early?(r<.6?1:2):(r<.38?1:r<.84?2:3);
+  const Zi=zoneOf(A);
+  if(!G.pq.length&&Math.random()<setChance()){const q=setPiece(Zi);if(q)G.pq=q}
+  if(G.pq.length){placeRow(G.pq.shift(),z,Zi);return}
+  const W=Zi===4?WOODS.w:ZONES[Zi].w,early=G.dist<120,r=Math.random(),n=early?(r<.6?1:2):(r<.38?1:r<.84?2:3);
   const lanes=shuffle([-1,0,1]).slice(0,n);
   const types=lanes.map(()=>{const q=Math.random();return G.dist<50?(q<.6?"cab":"stack"):q<W[0]?"cab":q<W[1]?"stack":"sign"});
   if(n===3&&types.every(t=>t==="cab"))types[Math.random()*3|0]=Math.random()<.5?"stack":"sign";
@@ -523,7 +568,7 @@ function row(z){const A=G.dist+z,ga=A-Math.round(A/ZL)*ZL;if(A>ZL/2&&A<BRK+20&&g
   if(free.length&&G.dist>G.nextPU&&!G.objs.some(o=>o.t==="pu")){const L=free.splice(Math.random()*free.length|0,1)[0];const k=pickPU();if(k==="vox")voxQueue();G.objs.push({t:"pu",k,lane:L,z});G.nextPU=G.dist+rr(220,360)}
   if(free.length&&Math.random()<.6){const L=free[Math.random()*free.length|0],id=++G.trI;G.trs[id]={got:0,broken:false};for(let i=0;i<5;i++)G.objs.push({t:"key",lane:L,z:z-1+i*1.5,tr:id})}}
 /* five keys in a row raise the multiplier; breaking a row you started lowers it */
-function gotKey(o){o.dead=1;G.keys++;G.pop=.3;G.kpts+=10*G.mult*(G.vox>0?2:1);const tr=G.trs[o.tr];let n=0;
+function gotKey(o){o.dead=1;G.lk=G.dist;G.keys++;G.pop=.3;G.kpts+=10*G.mult*(G.vox>0?2:1);const tr=G.trs[o.tr];let n=0;
   if(tr){n=++tr.got;if(n===5&&!tr.broken&&G.mult<5){G.mult++;G.maxMult=Math.max(G.maxMult,G.mult);pop("X"+G.mult+" STREAK",RED);sfx("trail",G.mult)}}
   sfx("key",{i:Math.max(0,n-1),m:G.mult})}
 /* power-ups never repeat one that is already running */
@@ -569,6 +614,8 @@ function update(h){
   {const k=Math.floor(G.dist/ZL)+1,z=k*ZL-G.dist;if(k%4===0&&k*ZL<=BRK&&z<30&&G.vk!==k){G.vk=k;sfx("vault")}}
   if(G.lap===1&&G.ck<3&&G.dist>[3560,3760,3905][G.ck]){G.ck++;sfx("crack",G.ck)}/* the far wall gives, a little more each time */
   if(G.zone===4){if(G.brk<2)G.brk+=h;if(G.wt<5)G.wt+=h;if(G.dist>G.deer){G.deer=G.dist+rr(520,900);const sd=Math.random()<.5?-1:1;G.objs.push({t:"deer",lane:-sd*3.2,dir:sd,z:30+rr(0,10)});sfx("deer",sd)}}
+  /* a streak has to be kept up: go too long without a key and it slips a step (skipping rows can't bank it) */
+  if(G.mult>1&&G.dist-G.lk>STREAK_M){G.mult--;G.lk=G.dist;pop("STREAK X"+G.mult,MUTE);sfx("boostEnd")}
   if(!G.passedBest&&G.bestD>40&&G.dist>G.bestD){G.passedBest=true;pop("NEW BEST",RED);sfx("best")}
   if(CH&&!G.beatCh&&score()>CH.s){G.beatCh=1;pop("YOU BEAT "+chName()+"!",RED);sfx("best")}
   lbMarks()
@@ -581,7 +628,8 @@ function hit(){G.state="over";G.ph="card";G.hitT=0;G.ovs=0;lbFetch();G.freeze=.1
   if(G.dist>G.bestD){G.bestD=G.dist;store("vk_run_bestd",Math.round(G.dist))}
   for(const o of G.objs)o.z+=1.4;/* bounce back so what you hit stays in view */G.score=score();G.newBest=G.score>G.best;
   if(G.newBest){G.best=G.score;store("vk_run_best",G.best)}
-  cards.t=null;cards.o=card([["GAME OVER",3,INK,8],["SCORE "+G.score,2,INK,6],["KEYS "+G.keys+"   STREAK X"+G.maxMult+"   CLOSE "+G.near,1,MUTE,5],[G.woods?"ESCAPED. "+Math.round(G.dist-BRK)+" M INTO THE WOODS":G.lap?"VAULTS OPENED "+G.lap:G.zone?"REACHED THE "+ZONES[G.zone].n:"THE ARCHIVE STARTS AT 500 M",1,MUTE,5],[G.newBest?"NEW BEST":"BEST "+G.best,1,G.newBest?RED:MUTE,CH?5:9]].concat(CH?[chResult().concat([9])].map(([t,c,g])=>[t,1,c,g]):[]),!LB.on?(TOUCH?"TAP TO CONTINUE":"SPACE TO CONTINUE"):lbQual(G.score)?(TOUCH?"TAP TO SIGN THE HIGH SCORES":"SPACE TO SIGN THE HIGH SCORES"):(TOUCH?"TAP FOR HIGH SCORES":"SPACE FOR HIGH SCORES   ESC TO LEAVE"));dirty=true}
+  G.auto=autoSave();const again=TOUCH?"TAP TO RUN AGAIN":"SPACE TO RUN AGAIN";
+  cards.t=null;cards.o=card([["GAME OVER",3,INK,8],["SCORE "+G.score,2,INK,6],["KEYS "+G.keys+"   STREAK X"+G.maxMult+"   CLOSE "+G.near,1,MUTE,5],[G.woods?"ESCAPED. "+Math.round(G.dist-BRK)+" M INTO THE WOODS":G.lap?"VAULTS OPENED "+G.lap:G.zone?"REACHED THE "+ZONES[G.zone].n:"THE ARCHIVE STARTS AT 500 M",1,MUTE,5],[G.newBest?"NEW BEST":"BEST "+G.best,1,G.newBest?RED:MUTE,CH?5:9]].concat(CH?[chResult().concat([9])].map(([t,c,g])=>[t,1,c,g]):[]),LB.on&&lbQual(G.score)&&!G.auto?(TOUCH?"TAP TO SIGN THE HIGH SCORES":"SPACE TO SIGN THE HIGH SCORES"):again);dirty=true}
 
 /* ---------- drawing ---------- */
 function blit(set,cx,by,s,snap){const b=set[0],w=b.width*s,h=b.height*s;if(w<.3||h<.3)return;const t=s*SS;
@@ -658,7 +706,13 @@ function scenery(){const x=ctx,Z=(VX?ZV:ZONES)[G.zone],px=1/SS,sn=v=>Math.round(
     for(const sg of[-1,1]){const xa=CX+sg*LW*.5*qa,xb=CX+sg*LW*.5*qb,wa=th*.8*qa,wb=th*.8*qb;x.beginPath();x.moveTo(xa-wa,ya);x.lineTo(xa+wa,ya);x.lineTo(xb+wb,yb);x.lineTo(xb-wb,yb);x.fill()}}
   for(let z=zs(7,0);z<FAR;z+=7){const q=qz(z),hw=WX*LW*q;if(hw>CX+BGM)continue;const yf=sn(fY(q)),yc=Math.max(0,sn(cY(q))),w=wd(q*1.3);x.fillRect(sn(CX-hw)-w,yc,w,yf-yc);x.fillRect(sn(CX+hw),yc,w,yf-yc)}
   x.fillStyle=Z.lamp;for(let z=zs(7,3.5);z<FAR;z+=7){const q=qz(z),y=sn(cY(q));if(y<0)continue;const hw=LW*.35*q;x.fillRect(sn(CX-hw),y,sn(hw*2),Math.max(px,sn(q*1.5)))}
-  if(G.lap===1)omens(sn)}
+  if(G.lap===1)omens(sn);if(!G.lap&&G.zone===0)exitHint(sn)}
+/* the first hint that there is a way out: in the mailroom, an EXIT sign hangs at the far end of the hall. It never gets
+   any closer however far you run, and before the archive it flickers and goes dark. Nothing else ever mentions it. */
+function exitHint(sn){const d=G.dist;if(G.state!=="run"||d<170||d>395)return;let a=Math.min(1,(d-170)/40);
+  if(d>350&&frh(Math.floor(G.t*14))<(d-350)/45)return;/* dying flicker */
+  const z=36,q=qz(z),s=P0*q*2.4,b=SP.exit[0],top=Math.max(0,cY(q)),y=top+10*q+b.height*s,px=1/SS;
+  ctx.globalAlpha=a;ctx.fillStyle=INK;for(const sg of[-1,1])ctx.fillRect(sn(CX+sg*b.width*s*.3),top,Math.max(px,q*.6),y-b.height*s-top);const gw=b.width*s*1.5,gh=b.height*s*1.8;ctx.globalAlpha=a*(.16+.06*Math.sin(G.t*5));ctx.fillStyle=PAL.f;ctx.fillRect(sn(CX-gw/2),sn(y-b.height*s/2-gh/2),gw,gh);ctx.globalAlpha=a;blit(SP.exit,CX,y,s);ctx.globalAlpha=1}
 /* the second time round, the building starts to show the way out: EXIT signs, and light at the far end */
 function omens(sn){const H=HC,px=1/SS;
   for(let z=zs(19,6);z<FAR-4;z+=19){if(z<ZMIN-1)continue;const k=Math.round((G.dist+z-6)/19),zn=zoneOf(G.dist+z);if(zn===4||zn!==3&&frh(k*.917)<.45)continue;
@@ -733,7 +787,7 @@ function drawPlayer(){const px=CX+G.x*LW;
   if(G.pop>0){const r=Math.round((.3-G.pop)*40)+5,cx=Math.round(px),cy=GY-Math.round(G.jy)-50;ctx.fillStyle=RED;ctx.fillRect(cx-r-1,cy,2,2);ctx.fillRect(cx+r-1,cy,2,2);ctx.fillRect(cx-1,cy-r,2,2)}}
 /* score and keys, sized for the screen rather than the hallway */
 function hud(){const s=String(G.state==="over"?G.score:score()),hs=HS,m=Math.round(hs*3.5),kp=Math.round(hs*.9);
-  text(ctx,s,m,m,hs,INK);const kx=m+tw(s,hs)+hs*3;ctx.drawImage((G.vox>0?SP.keyg:SP.key)[0],kx,m+Math.round((5*hs-5*kp)/2),13*kp,5*kp);const cx2=kx+13*kp+hs*2;text(ctx,String(G.keys),cx2,m,hs,INK);if(G.mult>1)text(ctx,"X"+G.mult,cx2+tw(String(G.keys),hs)+hs*3,m,hs,RED);
+  text(ctx,s,m,m,hs,INK);const kx=m+tw(s,hs)+hs*3;ctx.drawImage((G.vox>0?SP.keyg:SP.key)[0],kx,m+Math.round((5*hs-5*kp)/2),13*kp,5*kp);const cx2=kx+13*kp+hs*2;text(ctx,String(G.keys),cx2,m,hs,INK);if(G.mult>1)text(ctx,"X"+G.mult,cx2+tw(String(G.keys),hs)+hs*3,m,hs,G.dist-G.lk>STREAK_M-45&&((G.t*7)|0)%2?MUTE:RED);/* blinks while it is about to slip */
   const tgt=CH&&!G.beatCh&&G.state!=="over";if(tgt)text(ctx,"BEAT "+chName()+" "+commas(CH.s),m,m+hs*7,Math.max(1,Math.round(hs*.6)),MUTE);/* the score to beat, until you do */
   let y=m+hs*(tgt?11:8);for(const k of["mag","boost","shield","vox"]){const on=k==="shield"?G.shield:G[k]>0;if(!on)continue;const b=SP[PU[k].sp][0],ic=Math.max(1,Math.round(hs*.75));
     ctx.drawImage(b,m,y,b.width*ic,b.height*ic);if(k!=="shield"){const bx=m+b.width*ic+hs*2,bw=hs*18,bh=Math.max(2,hs),by=y+Math.round((b.height*ic-bh)/2);
@@ -835,7 +889,7 @@ function frame(t){raf=requestAnimationFrame(frame);if(VQ.length&&G.state==="run"
   if(G.state==="run"&&G.freeze>0){G.freeze-=dt;dirty=true}
   else if(G.state==="run"){let d2=dt;if(G.slo>0){const k=G.slo/SLO;G.slo=Math.max(0,G.slo-dt);d2=dt*(.28+.72*(1-k)*(1-k))}/* time slows as you cross over, then catches up */
     const n=Math.max(1,Math.ceil(d2/.017)),h=d2/n;for(let i=0;i<n&&G.state==="run";i++)update(h);dirty=true}
-  else if(G.state==="over"){if(G.freeze>0)G.freeze-=dt;else G.hitT+=dt;if(G.hitT<.8)dirty=true;if(!G.ovs&&G.hitT>.45){G.ovs=1;sfx("over",G.newBest)}if(G.ph==="card"&&G.hitT>2.8)lbNext()}
+  else if(G.state==="over"){if(G.freeze>0)G.freeze-=dt;else G.hitT+=dt;if(G.hitT<.8)dirty=true;if(!G.ovs&&G.hitT>.45){G.ovs=1;sfx("over",G.newBest)}if(G.ph==="card"&&G.hitT>1.9)lbNext()}
   if(G.state!=="pause"&&POP.length){for(const p of POP)p.a+=dt;while(POP.length&&POP[0].a>.9)POP.shift();POP.forEach((p,i)=>p.row=i);dirty=true}
   if(SND&&window.VKAudio){TK.state=G.state;TK.zone=G.zone;TK.vox=G.vox>0;TK.sp=Math.min(1,Math.max(0,(G.speed-V0)/(VMAX-V0)));TK.x=G.x;TK.mult=G.mult;TK.slo=G.slo;TK.boost=G.boost>0;TK.night=G.zone===4?WT.night:0;VKAudio.tick(TK)}/* the music follows the run */
   if(dirty){dirty=false;draw()}}
@@ -845,7 +899,7 @@ function act(a){if(busy)return;if(HT.open){HT.open=0;dirty=true;return}if(a==="h
   if(G.state==="title"&&(a==="left"||a==="right"||a==="down")){G.tHold=1;dirty=true}if(a==="close"){if(!HOME)close();else if(G.state!=="title")goHome();return}if(a==="sound")return toggleSound();if(a==="share"){if(G.state==="over"&&G.ph!=="name"&&G.hitT>.6)doShare();return}if(SND){loadAudio();const A=AU();if(A)A.unlock()}
   if(G.state==="title"){if(a==="go"||a==="up")start();return}
   if(G.state==="over"){if(G.ph==="name"){if(a==="go")namePress();else if(a==="left")nameMove(-1,0);else if(a==="right")nameMove(1,0);else if(a==="up")nameMove(0,-1);else if(a==="down")nameMove(0,1);return}
-    if((a==="go"||a==="up")&&G.hitT>.6){if(G.ph==="card")lbNext();else start()}return}
+    if((a==="go"||a==="up")&&G.hitT>.6){if(G.ph==="card"&&LB.on&&lbQual(G.score)&&!G.auto)lbNext();else start()}return}
   if(G.state==="pause"){if(a==="go"||a==="up"||a==="pause"){G.state="run";sfx("resume");dirty=true}return}
   if(a==="pause"){G.state="pause";sfx("pause");dirty=true}
   else if(a==="left"){if(G.lane>-1){G.lane--;sfx("lane",-1)}}
@@ -905,5 +959,5 @@ function close(){if(!root||busy)return;busy=true;cancelAnimationFrame(raf);raf=0
   dctx.clearRect(0,0,dc.width,dc.height);dctx.drawImage(gc,0,0);dc.style.display="block";root.classList.remove("on");document.documentElement.classList.remove("vkg-lock");
   blocks(cells(),240,c=>dctx.clearRect(c[0],c[1],CELL*SS,CELL*SS),done)}
 
-window.VKGame={open,close,get running(){return !!raf},get state(){return root?G.state:"closed"},stats:()=>({frames:G.frames,ms:G.ms,iw,ih}),_G:G,_draw:()=>draw(),_pop:pop,_SP:SP,_sprites:sprites,_voxPrep:voxPrep,_cells:()=>{VC=wave(true)},_LB:LB,_share:()=>shareText(),_CH:CH,help(){if(!root)open();HT.open=1;G.tHold=1;dirty=true},invite:cb=>doInvite(cb),_invite:()=>inviteText()};
+window.VKGame={open,close,get running(){return !!raf},get state(){return root?G.state:"closed"},stats:()=>({frames:G.frames,ms:G.ms,iw,ih}),_G:G,_draw:()=>draw(),_pop:pop,_SP:SP,_sprites:sprites,_voxPrep:voxPrep,_cells:()=>{VC=wave(true)},_LB:LB,_share:()=>shareText(),_CH:CH,help(){if(!root)open();HT.open=1;G.tHold=1;dirty=true},invite:cb=>doInvite(cb),_invite:()=>inviteText(),_SETS:SETS,_step:h=>update(h)};
 })();

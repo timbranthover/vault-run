@@ -22,7 +22,7 @@ for (const [name, opts] of [["phone", { viewport: { width: 390, height: 844 }, d
   }
   await pg.evaluate("VKGame._G.grace=1e9;window.dispatchEvent(new KeyboardEvent('keydown',{code:'ArrowDown',key:'ArrowDown',bubbles:true}))"); await pg.waitForTimeout(300);
   if (!(await pg.evaluate("VKGame._G.slide>0"))) fail(`${name}: slide did not start`); else ok(`${name}: ran every zone and slid`);
-  await pg.evaluate("clearInterval(window.__bot);const G=VKGame._G;G.grace=0;G.shield=0;G.objs.push({t:'cab',v:'cab',lane:Math.round(G.x),z:1.5})"); await pg.waitForTimeout(3500);
+  await pg.evaluate("clearInterval(window.__bot);const G=VKGame._G;G.grace=0;G.shield=0;G.boost=0;G.objs.push({t:'cab',v:'cab',lane:Math.round(G.x),z:1.5})"); await pg.waitForTimeout(3500);
   if (await pg.evaluate("VKGame.state") !== "over") fail(`${name}: crash did not end the run`); else ok(`${name}: game over`);
   const t = await pg.evaluate("VKGame._share()"); if (!/\/r\/\S+$/.test(t)) fail(`${name}: share text has no challenge link: ${t}`); else ok(`${name}: share text`);
   const code = t.trim().split("/r/")[1];

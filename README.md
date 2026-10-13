@@ -27,7 +27,7 @@ in the source. The music and sound are synthesized live in `public/audio.js`.
 | `pages/api/r.js` | Challenge links, `/r/<code>`: a page that unfurls into a picture of the run |
 | `pages/api/card.js` | The picture itself, a PNG drawn with the game's pixel font |
 | `lib/code.js` | The short, tamper-checked code a challenge link carries |
-| `tests/` | A local server, quick checks, and a browser smoke test |
+| `tests/` | A local server, quick checks, a browser smoke test, and a fairness test |
 
 Hosted on Vercel (Hobby). The board is built to stay inside Blob's free allowance
 however many people play: views come from memory and the edge cache, and a save that
@@ -38,7 +38,7 @@ can't get through waits on the player's device and is sent later, so no run is l
 ```sh
 npm install
 npm run serve          # http://localhost:8787/run  (in-memory board, no keys needed)
-npm test               # quick checks + a headless play-through of every room
+npm test               # quick checks, a headless play-through of every room, and a fairness test
 ```
 
 Add `?fps` to the address to see the frame rate.
