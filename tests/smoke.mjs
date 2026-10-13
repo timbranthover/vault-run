@@ -26,12 +26,21 @@ for (const [name, opts] of [["phone", { viewport: { width: 390, height: 844 }, d
   await pg.evaluate("clearInterval(window.__bot);const G=VKGame._G;G.lap=0;G.zone=0;G.vox=0;G.dist=420;G.lane=-1;G.x=-1;G.jy=0;G.grace=1e9;G.objs=G.objs.filter(o=>o.t==='key')");
   await pg.waitForFunction("440-VKGame._G.dist<2", null, { timeout: 8000, polling: 10 }); await pg.keyboard.press("ArrowLeft"); await pg.waitForTimeout(300);
   if (await pg.evaluate("VKGame.state") !== "room") fail(`${name}: the door did not open`);
-  else { for (const k of ["ArrowUp", "ArrowUp"]) { await pg.keyboard.press(k); await pg.waitForTimeout(900) } await pg.waitForTimeout(4200);
-    const know = await pg.evaluate("VKGame._R.know"); for (let i = 0; i < 3; i++) { await pg.keyboard.press("ArrowDown"); await pg.waitForTimeout(1100) } await pg.waitForTimeout(600);
+  else { await pg.waitForTimeout(1800); // he steps in on his own; then over to the big desk
+    for (const k of ["ArrowRight", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp", "ArrowUp"]) { await pg.keyboard.press(k); await pg.waitForTimeout(600) } await pg.waitForTimeout(4400);
+    const know = await pg.evaluate("VKGame._R.know"); // and back out the way he came
+    for (const k of ["ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowDown", "ArrowLeft", "ArrowLeft"]) { await pg.keyboard.press(k); await pg.waitForTimeout(600) } await pg.waitForTimeout(1600);
     const back = await pg.evaluate("[VKGame.state,VKGame._G.objs.some(o=>o.z<12&&(o.t==='cab'||o.t==='stack'||o.t==='sign'))]");
     if (!know) fail(`${name}: no realization at the desk`); else if (back[0] !== "run" || back[1]) fail(`${name}: did not return safely to the run`); else ok(`${name}: the room, in and out`) }
-  await pg.evaluate("clearInterval(window.__bot);const G=VKGame._G;G.grace=0;G.shield=0;G.boost=0;G.objs.push({t:'cab',v:'cab',lane:Math.round(G.x),z:1.5})"); await pg.waitForTimeout(3500);
+  await pg.evaluate("clearInterval(window.__bot);localStorage.setItem('vk_run_name','SMOKE');const G=VKGame._G;G.grace=0;G.shield=0;G.boost=0;G.objs.push({t:'cab',v:'cab',lane:Math.round(G.x),z:1.5})"); await pg.waitForTimeout(3500);
   if (await pg.evaluate("VKGame.state") !== "over") fail(`${name}: crash did not end the run`); else ok(`${name}: game over`);
+  // a tap right after a crash goes to the high scores, never straight into a new run; a tap there runs again
+  await pg.keyboard.press("Space"); await pg.waitForTimeout(400);
+  await pg.evaluate("const G=VKGame._G;G.grace=0;G.shield=0;G.boost=0;G.objs.push({t:'cab',v:'cab',lane:Math.round(G.x),z:1.2})"); await pg.waitForTimeout(1000);
+  await pg.keyboard.press("Space"); await pg.waitForTimeout(200); const after = await pg.evaluate("[VKGame.state,VKGame._G.ph]");
+  await pg.waitForTimeout(1300); await pg.keyboard.press("Space"); await pg.waitForTimeout(300); const again = await pg.evaluate("VKGame.state");
+  if (after[0] !== "over" || after[1] === "card") fail(`${name}: a quick tap after a crash did ${after}`); else if (again !== "run") fail(`${name}: tap on the board did not run again`); else ok(`${name}: safe run-again`);
+  await pg.evaluate("const G=VKGame._G;G.grace=0;G.shield=0;G.boost=0;G.objs.push({t:'cab',v:'cab',lane:Math.round(G.x),z:1.2})"); await pg.waitForTimeout(2500);
   const t = await pg.evaluate("VKGame._share()"); if (!/\/r\/\S+$/.test(t)) fail(`${name}: share text has no challenge link: ${t}`); else ok(`${name}: share text`);
   const code = t.trim().split("/r/")[1];
   await pg.goto(`${BASE}/r/${code}`); await pg.waitForTimeout(1200);

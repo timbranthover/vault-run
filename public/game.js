@@ -121,8 +121,9 @@ const pine=(W,H,tiers)=>grid(W,H,(x,y)=>{const c=(W-1)/2,tb=H-3;if(y>=tb)return 
     if(y===b&&(x+i)%2&&Math.abs(x-c)>1)continue;if(y>=b-1&&i<tiers.length-1)return x<c?"e":"E";return x<c-hw*.35?"v":x>c+hw*.3?"E":"e"}return""});
 Object.assign(OBS,{
   /* dodge: a mossy boulder, or a pine standing right in the trail */
-  rock:grid(17,18,(x,y)=>{const ins=(X,Y)=>Y<=17&&((X-8)/8.1)**2+((Y-11.5)/9.6)**2<=1&&!(Y<4&&((X-8)/5)**2+((Y-4)/3)**2>1);if(!ins(x,y))return"";
-    if(!ins(x,y-1))return x%4===1?"e":"v";if(!ins(x,y-2)&&x%3)return"v";if(!ins(x+1,y)||((x-8)/8.1)>.38&&y>8||y===17)return"O";return(x*5+y*3)%13===0?"O":"o"}),
+  rock:grid(17,30,(x,y)=>{const ins=(X,Y)=>Y<=29&&(((X-8)/8.2)**2+((Y-22)/7.8)**2<=1||((X-7.5)/6.2)**2+((Y-11.5)/11)**2<=1);if(!ins(x,y))return"";/* a tall standing stone on a wide base: too high to jump */
+    if(!ins(x,y-1))return x%4===1?"e":"v";if(!ins(x,y-2)&&x%3)return"v";if(y===15&&x>3&&x<11||y===16&&(x===4||x===11))return"O";/* where the two stones meet */
+    if(!ins(x+1,y)||x>11&&y>16||x>10&&y<15||y===29)return"O";return(x*5+y*3)%13===0?"O":"o"}),
   pine:pine(15,30,[[0,8,3.4],[5,14,5],[11,20,6.4],[17,27,7.4]]),
   /* jump: a fallen log, rings on the cut end, moss on top */
   log:grid(18,8,(x,y)=>{if(y===0)return[6,7].includes(x)?"v":x>=12&&x<=14?(x===13?"w":"r"):"";if(y===1&&x===13)return"j";const d=Math.hypot(x-2.5,y-4);if(x<=5&&d<=3.4)return d<1.1?"a":d<2.2?"u":d<2.9?"a":"H";
@@ -377,7 +378,7 @@ function lbTake(j,keep){if(!j||!Array.isArray(j.top))return;const v=+j.v||0;if(v
   if(keep!==false)store("vk_run_lb",JSON.stringify({v,top:j.top,cut:LB.cut,total:LB.total}))}
 try{lbTake(JSON.parse(store("vk_run_lb")||"null"),false)}catch(e){}
 function lbFetch(){if(lbFetch.p)return;lbFetch.p=1;const ac=window.AbortController?new AbortController():null,to=setTimeout(()=>ac&&ac.abort(),6000);
-  fetch(API,{cache:"no-store",signal:ac&&ac.signal}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.on===false){LB.on=false;dirty=true}else if(j&&j.on){lbTake(j);passCheck();pqFlush()}}).catch(()=>{}).then(()=>{clearTimeout(to);lbFetch.p=0})}
+  fetch(API,{cache:"no-store",signal:ac&&ac.signal}).then(r=>r.ok?r.json():null).then(j=>{if(j&&j.on===false){LB.on=false;dirty=true}else if(j&&j.on){lbTake(j);passCheck();pqFlush();lateSave()}}).catch(()=>{}).then(()=>{clearTimeout(to);lbFetch.p=0})}
 /* a run that couldn't be saved is never dropped: it waits on this device and is sent the next time the board answers.
    Its run id means a run that did get through, and is sent again, is recognised and never saved twice */
 const PQ=()=>{try{const a=JSON.parse(store("vk_run_pending")||"[]");return Array.isArray(a)?a:[]}catch(e){return[]}},pqSet=a=>store("vk_run_pending",JSON.stringify(a.slice(-20)));
@@ -418,6 +419,8 @@ function autoSave(){const n=(store("vk_run_name")||"").replace(/[^A-Z0-9]/g,"").
   fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(r=>r.json().catch(()=>null).then(j=>({ok:r.ok,j}))).then(({ok,j})=>{
     if(ok&&j&&Array.isArray(j.top)){lbTake(j);if(j.saved){mineAdd(n,s);track("signed",{rank:j.rank<=10?"top 10":"board"})}passCheck();if(G.rid===rid&&G.state==="over")LB.me={n,s,w:body.w,rank:j.rank||0,saved:!!j.saved};dirty=true}
     else{const er=j&&j.error;if(er!=="word"&&er!=="score")keep()}}).catch(keep);return true}
+/* the board arrived after the crash: a run that makes it is still signed (or offered for signing), never dropped */
+function lateSave(){if(G.state!=="over"||G.auto||G.ph==="name"||!lbQual(G.score)||LB.me&&LB.me.saved)return;G.auto=autoSave();if(!G.auto&&G.ph==="board")toName();dirty=true}
 function toName(){G.ph="name";LB.name=(store("vk_run_name")||"").replace(/[^A-Z0-9]/g,"").slice(0,NL);LB.gy=LB.name?4:0;LB.gx=LB.name?7:0;LB.msg="";LB.busy=false;dirty=true}
 function toBoard(){G.ph="board";LB.rv=performance.now();dirty=true}
 function nameSkip(){LB.me={n:"",s:G.score,rank:0,saved:false};toBoard()}
@@ -625,7 +628,7 @@ function hit(){G.state="over";G.ph="card";G.hitT=0;G.ovs=0;lbFetch();G.freeze=.1
   for(const o of G.objs)o.z+=1.4;/* bounce back so what you hit stays in view */G.score=score();G.newBest=G.score>G.best;
   if(G.newBest){G.best=G.score;store("vk_run_best",G.best)}
   G.auto=autoSave();const again=TOUCH?"TAP TO RUN AGAIN":"SPACE TO RUN AGAIN";
-  cards.t=null;cards.o=card([["GAME OVER",3,INK,8],["SCORE "+G.score,2,INK,6],["KEYS "+G.keys+"   STREAK X"+G.maxMult+"   CLOSE "+G.near,1,MUTE,5],[G.woods?"ESCAPED. "+Math.round(G.dist-BRK)+" M INTO THE WOODS":G.lap?"VAULTS OPENED "+G.lap:G.zone?"REACHED THE "+ZONES[G.zone].n:"THE ARCHIVE STARTS AT 500 M",1,MUTE,5],[G.newBest?"NEW BEST":"BEST "+G.best,1,G.newBest?RED:MUTE,CH?5:9]].concat(CH?[chResult().concat([9])].map(([t,c,g])=>[t,1,c,g]):[]),LB.on&&lbQual(G.score)&&!G.auto?(TOUCH?"TAP TO SIGN THE HIGH SCORES":"SPACE TO SIGN THE HIGH SCORES"):again);dirty=true}
+  cards.t=null;cards.o=card([["GAME OVER",3,INK,8],["SCORE "+G.score,2,INK,6],["KEYS "+G.keys+"   STREAK X"+G.maxMult+"   CLOSE "+G.near,1,MUTE,5],[G.woods?"ESCAPED. "+Math.round(G.dist-BRK)+" M INTO THE WOODS":G.lap?"VAULTS OPENED "+G.lap:G.zone?"REACHED THE "+ZONES[G.zone].n:"THE ARCHIVE STARTS AT 500 M",1,MUTE,5],[G.newBest?"NEW BEST":"BEST "+G.best,1,G.newBest?RED:MUTE,CH?5:9]].concat(CH?[chResult().concat([9])].map(([t,c,g])=>[t,1,c,g]):[]),LB.on&&lbQual(G.score)&&!G.auto?(TOUCH?"TAP TO SIGN THE HIGH SCORES":"SPACE TO SIGN THE HIGH SCORES"):LB.on?(TOUCH?"TAP FOR THE HIGH SCORES":"SPACE FOR THE HIGH SCORES"):again);dirty=true}
 
 /* ---------- drawing ---------- */
 function blit(set,cx,by,s,snap){const b=set[0],w=b.width*s,h=b.height*s;if(w<.3||h<.3)return;const t=s*SS;
@@ -702,13 +705,7 @@ function scenery(){const x=ctx,Z=(VX?ZV:ZONES)[G.zone],px=1/SS,sn=v=>Math.round(
     for(const sg of[-1,1]){const xa=CX+sg*LW*.5*qa,xb=CX+sg*LW*.5*qb,wa=th*.8*qa,wb=th*.8*qb;x.beginPath();x.moveTo(xa-wa,ya);x.lineTo(xa+wa,ya);x.lineTo(xb+wb,yb);x.lineTo(xb-wb,yb);x.fill()}}
   for(let z=zs(7,0);z<FAR;z+=7){const q=qz(z),hw=WX*LW*q;if(hw>CX+BGM)continue;const yf=sn(fY(q)),yc=Math.max(0,sn(cY(q))),w=wd(q*1.3);x.fillRect(sn(CX-hw)-w,yc,w,yf-yc);x.fillRect(sn(CX+hw),yc,w,yf-yc)}
   x.fillStyle=Z.lamp;for(let z=zs(7,3.5);z<FAR;z+=7){const q=qz(z),y=sn(cY(q));if(y<0)continue;const hw=LW*.35*q;x.fillRect(sn(CX-hw),y,sn(hw*2),Math.max(px,sn(q*1.5)))}
-  if(G.lap===1)omens(sn);if(!G.lap&&G.zone===0)exitHint(sn)}
-/* the first hint that there is a way out: in the mailroom, an EXIT sign hangs at the far end of the hall. It never gets
-   any closer however far you run, and before the archive it flickers and goes dark. Nothing else ever mentions it. */
-function exitHint(sn){const d=G.dist;if(G.state!=="run"||d<170||d>395)return;let a=Math.min(1,(d-170)/40);
-  if(d>350&&frh(Math.floor(G.t*14))<(d-350)/45)return;/* dying flicker */
-  const z=36,q=qz(z),s=P0*q*2.4,b=SP.exit[0],top=Math.max(0,cY(q)),y=top+10*q+b.height*s,px=1/SS;
-  ctx.globalAlpha=a;ctx.fillStyle=INK;for(const sg of[-1,1])ctx.fillRect(sn(CX+sg*b.width*s*.3),top,Math.max(px,q*.6),y-b.height*s-top);const gw=b.width*s*1.5,gh=b.height*s*1.8;if(ROOMSEEN){ctx.globalAlpha=a*.3;blit(SP.exit,CX,y,s);ctx.globalAlpha=1;return}/* once he knows, the sign is dark */ctx.globalAlpha=a*(.16+.06*Math.sin(G.t*5));ctx.fillStyle=PAL.f;ctx.fillRect(sn(CX-gw/2),sn(y-b.height*s/2-gh/2),gw,gh);ctx.globalAlpha=a;blit(SP.exit,CX,y,s);ctx.globalAlpha=1}
+  if(G.lap===1)omens(sn)}
 /* the second time round, the building starts to show the way out: EXIT signs, and light at the far end */
 function omens(sn){const H=HC,px=1/SS;
   for(let z=zs(19,6);z<FAR-4;z+=19){if(z<ZMIN-1)continue;const k=Math.round((G.dist+z-6)/19),zn=zoneOf(G.dist+z);if(zn===4||zn!==3&&frh(k*.917)<.45)continue;
@@ -765,7 +762,7 @@ function drawObj(o){if(o.t==="gate")return drawGate(o);const q=qz(o.z),s=P0*q,lx
     else if(top>yc){ctx.fillStyle=INK;if(HP[o.v]===1)ctx.fillRect(lx-lw/2,yc,lw,top-yc);else{const hw=img[0].width*s*.32;ctx.fillRect(lx-hw,yc,lw,top-yc);ctx.fillRect(lx+hw-lw,yc,lw,top-yc)}}spr(o.v,lx,by,s,o.lane)}
   else{blit(SP.sh,lx,fy+s*1.5,s*1.1);spr(o.v||o.t,lx,fy,s,o.lane)}
   ctx.globalAlpha=1}
-function drawPlayer(){if(G.noPl)return;const tg=G.state==="title"&&titleGl(),px=CX+G.x*LW+(tg&&((performance.now()/45)|0)%3===0?(((performance.now()/90)|0)%2?.6:-.6):0);
+function drawPlayer(){const tg=G.state==="title"&&titleGl(),px=CX+G.x*LW+(tg&&((performance.now()/45)|0)%3===0?(((performance.now()/90)|0)%2?.6:-.6):0);
   blit(SP.sh,px,GY+3,P0*Math.max(.45,1-G.jy/70));
   if(G.state!=="title")drawDust();
   if(G.state==="over"&&G.hitT<.7&&((G.hitT*14)|0)%2)return;
@@ -810,7 +807,7 @@ function homeTap(cx,cy){if(!HB.live)return false;const r=gc.getBoundingClientRec
   for(const h of HB.hits)if(x>=h.x&&x<h.x+h.w&&y>=h.y&&y<h.y+h.h){h.a();return true}return false}
 /* standalone page: back to the home screen from a run or the board */
 function goHome(){LB.me=null;SHAT=null;Object.assign(G,{state:"title",ph:"card",tt:performance.now(),tHold:0,dist:0,lane:0,x:0,jy:0,slide:0,cam:0,sq:0,freeze:0,mag:0,boost:0,shield:0,grace:0,vox:0,vtr:0,slo:0,fxT:9,zone:0,zprev:0,zf:9,lap:0,woods:0,brk:9,wt:9});
-  G.objs.length=0;POP.length=0;cards.t=null;SNAP=null;lbFetch();sfx("toggle");dirty=true}
+  G.objs.length=0;POP.length=0;cards.t=null;FB=null;lbFetch();sfx("toggle");dirty=true}
 let XS=null;function homeX(){const t=G.state==="title";if(XS===t)return;XS=t;btn.style.display=t?"none":"";sbtn.style.right=t?"12px":""}
 function openHelp(){HT.open=1;G.tHold=1;sfx("toggle");track("how to play");dirty=true}
 /* a short card: the three moves, the four power-ups, and keys; nothing about what lies beyond the vault */
@@ -881,13 +878,15 @@ function draw(){const t0=performance.now(),x=ctx;let sx=0,sy=0;if(G.state==="roo
 
 /* ---------- the room that runs the game ----------
    In the mailroom there is a door, left a little open, that blends into the wall. Push him into it (left, when he's already
-   in the left lane) and the run stops. Inside: server racks, a desk of monitors, and one screen as big as the far wall
-   showing the hall he was just in. He walks with the same moves he runs with (up and down to walk, left and right to step),
-   and every input lands on the monitors as it happens. At the desk the whole run plays back, every move of it, and he
-   understands. Then he walks out (keep pressing down) and the run carries on exactly where it was. No words but one line,
-   no score while you're in there, and nothing is counted anywhere. */
-const DOOR_A=440,RXW=2.45,RZB=4.9,RZR=[.35,1.75,3.1],RDK=3.6,ROOM={bg:"#121519",floor:"#1A1E23",grid:"#232930",wall:"#15191D",rack:"#22282F",unit:"#2B323A",face:"#191D22"};
-let ROOMSEEN=store("vk_run_room")==="1",SNAP=null;const R={};
+   in the left lane) and the run stops. He steps into a dark server room: racks down both walls and in rows, a few desks, and
+   on the far wall one screen as big as the wall. It shows this room, from where you are watching. He walks with the same
+   moves he runs with (up, down, left, right: one step each), every input lands on the monitors as it happens, and at the
+   desk the whole run plays back. He understands, and turns to look at you. To leave, walk him back to the doorway and push
+   into it again; the run carries on exactly where it was. No words but one line, no score in here, nothing counted. */
+const DOOR_A=440,RMW=4.6,RMD=11,RMAP=["E......","...d...",".......",".R...R.",".R.t.R.",".R...R.",".......",".DDDDD."],/* near row first, columns left to right */
+  RC={bg:"#0B0D10",floor:"#171B20",grid:"#20262D",wall:"#13171B",wtop:"#1E242B",rack:"#232A31",rside:"#1A1F25",rtop:"#2D353E",desk:"#2A3038",dtop:"#353D46",dside:"#21262C"};
+let ROOMSEEN=store("vk_run_room")==="1",FB=null;const R={},CAM={x:0,y:5.2,z:-6,p:.46,F:1,cy:0};
+const cellX=c=>c*1.15,cellZ=c=>1+c*1.25,free=(cx,cz)=>cz>=0&&cz<8&&cx>=-3&&cx<=3&&".E".includes(RMAP[cz][cx+3]);
 const doorZ=()=>DOOR_A-G.dist,doorOn=()=>!G.lap&&!G.rmUsed&&G.state==="run";
 function doorNear(){const z=doorZ();return doorOn()&&G.jy<20&&z>-2.2&&z<4.8}
 /* keep the left lane clear for a few metres either side of the door, so getting in is about noticing it, not dodging */
@@ -902,88 +901,91 @@ function drawDoor(Z){if(G.lap||G.zone)return;const z=doorZ();if(z<ZMIN-2||z>FAR-
   ctx.globalAlpha=1}
 /* how close the door is, for its hum */
 const doorHum=()=>{if(!doorOn())return 0;const z=doorZ();return z<-3||z>34?0:Math.pow(1-Math.abs(z)/34,2)};
-function snapHall(){const c=mk(gc.width,gc.height),o=ctx;ctx=c.getContext("2d");ctx.imageSmoothingQuality="high";G.noPl=1;
-  try{world(G.vox>0,0,0);ctx.setTransform(1,0,0,1,0,0);hud()}catch(e){}G.noPl=0;ctx=o;return c}
-function enterRoom(){SNAP=snapHall();G.rmUsed=1;G.state="room";Object.assign(R,{t:0,l:0,r:0,rx:0,rz:-.9,face:0,walk:0,last:0,rep:-1,know:0,gl:0,out:-1,ml:G.lane,mx:G.lane,mj:0,ms:0,mg:0,flash:-9,seen:G.il.length,wait:0});
-  POP.length=0;sfx("door");dirty=true}
-function exitRoom(){G.state="run";G.objs=G.objs.filter(o=>!(o.z<26&&(o.t==="cab"||o.t==="stack"||o.t==="sign")));G.lane=-1;G.x=-1;G.fin=.8;G.slide=0;G.jy=0;G.vy=0;SNAP=null;sfx("doorOut");dirty=true}
-function roomAct(a){if(a==="pause"||R.out>=0)return;const c=a==="left"?0:a==="right"?1:a==="down"?3:a==="up"||a==="go"?2:-1;if(c<0)return;
-  G.il.push(c);if(G.il.length>600)G.il.shift();R.last=R.t;R.flash=R.t;R.wait=0;R.gl=0;sfx("relay",c);
-  /* the runner on the big screen does what you tell it, too */
-  if(c===0)R.ml=Math.max(-1,R.ml-1);else if(c===1)R.ml=Math.min(1,R.ml+1);else if(c===2&&!R.mj)R.mj=.001;else if(c===3)R.ms=.6;
-  if(c===0)R.l=Math.max(-1,R.l-1);else if(c===1)R.l=Math.min(1,R.l+1);
-  else if(c===2){R.face=0;if(R.r<2)R.r++}
-  else{R.face=1;if(R.r>0)R.r--;else if(Math.abs(R.rz-RZR[0])<.2)R.out=0}}
-function roomUpdate(dt){R.t+=dt;const tz=R.out>=0?-1.6:RZR[R.r],sp=1.9*dt,ox=R.rx,oz=R.rz;
-  R.rx+=Math.max(-sp*1.2,Math.min(sp*1.2,R.l-R.rx));R.rz+=Math.max(-sp,Math.min(sp,tz-R.rz));const mv=Math.abs(R.rx-ox)+Math.abs(R.rz-oz)>1e-4;
-  if(mv){R.walk+=dt;if((R.walk*4.2|0)!==((R.walk-dt)*4.2|0))sfx("rstep",R.rx)}
-  R.mx+=(R.ml-R.mx)*Math.min(1,dt*14);if(R.mj>0){R.mj+=dt;if(R.mj>.6)R.mj=0}if(R.ms>0)R.ms-=dt;
-  if(R.out>=0){R.out+=dt;if(R.out>.95)exitRoom();return}
-  /* standing at the desk for the first time: the whole run plays back on the monitors */
-  if(R.r===2&&R.rep<0&&Math.abs(R.rz-RZR[2])<.05){R.rep=0;sfx("replay",G.il.length)}
-  if(R.rep>=0&&!R.know){R.rep+=dt;if(R.rep>3.4){R.know=1;R.gl=1.9;if(!ROOMSEEN){ROOMSEEN=true;store("vk_run_room",1)}sfx("know")}}
-  if(R.gl>0)R.gl-=dt;
+function enterRoom(){G.rmUsed=1;G.state="room";FB=null;Object.assign(R,{t:0,cx:-2,cz:1,px:-RMW-.4,pz:cellZ(0),path:[[-3,0],[-2,0],[-2,1]],face:0,walk:0,last:1.6,rep:-1,know:0,gl:0,turn:0,out:-1,flash:-9,seen:G.il.length,wait:0,bump:0});
+  CAM.x=-1;CAM.z=cellZ(1)-7.2;POP.length=0;sfx("door");dirty=true}
+function exitRoom(){G.state="run";G.objs=G.objs.filter(o=>!(o.z<26&&(o.t==="cab"||o.t==="stack"||o.t==="sign")));G.lane=-1;G.x=-1;G.fin=.8;G.slide=0;G.jy=0;G.vy=0;FB=null;sfx("doorOut");dirty=true}
+function roomAct(a){if(a==="pause"||R.out>=0||R.path.length)return;const c=a==="left"?0:a==="right"?1:a==="down"?3:a==="up"||a==="go"?2:-1;if(c<0)return;
+  G.il.push(c);if(G.il.length>600)G.il.shift();R.last=R.t;R.flash=R.t;R.wait=0;R.gl=0;R.turn=0;sfx("relay",c);
+  if(c===0&&R.cx===-3&&R.cz===0){R.out=0;R.face=0;return}/* back out through the doorway */
+  const nx=R.cx+(c===0?-1:c===1?1:0),nz=R.cz+(c===2?1:c===3?-1:0);if(c===2)R.face=0;if(c===3)R.face=1;
+  if(free(nx,nz)){R.cx=nx;R.cz=nz}else{R.bump=.18;sfx("rstep",0)}}
+function roomUpdate(dt){R.t+=dt;if(R.path.length&&R.cx===R.path[0][0]&&R.cz===R.path[0][1]&&Math.hypot(R.px-cellX(R.cx),R.pz-cellZ(R.cz))<.05)R.path.shift();
+  if(R.path.length){R.cx=R.path[0][0];R.cz=R.path[0][1]}/* he steps in a few paces on his own */
+  const tx=R.out>=0?-RMW-.8:cellX(R.cx),tz=R.out>=0?cellZ(0):cellZ(R.cz),sp=2.6*dt,ox=R.px,oz=R.pz;
+  R.px+=Math.max(-sp,Math.min(sp,tx-R.px));R.pz+=Math.max(-sp,Math.min(sp,tz-R.pz));const mv=Math.abs(R.px-ox)+Math.abs(R.pz-oz)>1e-4;
+  if(mv){R.walk+=dt;if((R.walk*4.2|0)!==((R.walk-dt)*4.2|0))sfx("rstep",R.px/RMW)}if(R.bump>0)R.bump-=dt;
+  CAM.x+=(R.px*.85-CAM.x)*Math.min(1,dt*2.5);CAM.z+=(Math.max(-6.4,Math.min(1.4,R.pz-(ih>iw*1.2?6:7.2)))-CAM.z)*Math.min(1,dt*2.5);
+  if(R.out>=0){R.out+=dt;if(R.out>1.1)exitRoom();return}
+  /* at the big desk for the first time: the whole run plays back, then he sees himself on the screen, and turns to you */
+  if(R.cz===6&&R.rep<0&&Math.abs(R.pz-cellZ(6))<.05){R.rep=0;sfx("replay",G.il.length)}
+  if(R.rep>=0&&!R.know){R.rep+=dt;if(R.rep>3.4){R.know=1;R.gl=1;R.turn=4.5;if(!ROOMSEEN){ROOMSEEN=true;store("vk_run_room",1)}sfx("know")}}
+  if(R.gl>0)R.gl-=dt;else if(R.turn>0){R.turn-=dt;R.face=1}
   if(!R.wait&&R.t-R.last>6){R.wait=1;sfx("wait")}}
-/* a side wall of the room, like wq for the hall */
-function rq(sg,za,zb,h1,h2){za=Math.max(za,ZMIN-1);if(zb<=za)return;const qa=qz(za),qb=qz(zb),xa=CX+sg*RXW*LW*qa,xb=CX+sg*RXW*LW*qb,fa=fY(qa),fb=fY(qb);
-  ctx.beginPath();ctx.moveTo(xa,fa-h1*qa);ctx.lineTo(xa,fa-h2*qa);ctx.lineTo(xb,fb-h2*qb);ctx.lineTo(xb,fb-h1*qb);ctx.fill()}
-/* tiny arrows: left, right, up, down */
-function arrow(c,x,y,s,col){ctx.fillStyle=col;const m=c===0?[[0,0,1,0,0],[0,1,1,0,0],[1,1,1,1,1],[0,1,1,0,0],[0,0,1,0,0]]:c===1?[[0,0,1,0,0],[0,0,1,1,0],[1,1,1,1,1],[0,0,1,1,0],[0,0,1,0,0]]:c===2?[[0,0,1,0,0],[0,1,1,1,0],[1,0,1,0,1],[0,0,1,0,0],[0,0,1,0,0]]:[[0,0,1,0,0],[0,0,1,0,0],[1,0,1,0,1],[0,1,1,1,0],[0,0,1,0,0]];
-  for(let j=0;j<5;j++)for(let i=0;i<5;i++)if(m[j][i])ctx.fillRect(x+i*s,y+j*s,s,s)}
+/* the room is drawn from a camera up high and behind, the way a security camera would see it */
+function PJ(x,y,z){const dx=x-CAM.x,dy=y-CAM.y,dz=z-CAM.z,s=Math.sin(CAM.p),c=Math.cos(CAM.p),zc=Math.max(.3,dz*c-dy*s),yc=dy*c+dz*s;return[CX+CAM.F*dx/zc,CAM.cy-CAM.F*yc/zc,zc]}
+function poly(col,...p){const x=ctx;x.fillStyle=col;x.beginPath();p.forEach((v,i)=>{const q=PJ(v[0],v[1],v[2]);i?x.lineTo(q[0],q[1]):x.moveTo(q[0],q[1])});x.fill()}
+/* a box, its visible faces only */
+function box(x0,x1,y1,z0,z1,cf,cs,ct){if(CAM.y>y1)poly(ct,[x0,y1,z0],[x1,y1,z0],[x1,y1,z1],[x0,y1,z1]);
+  if(CAM.x<x0)poly(cs,[x0,0,z0],[x0,y1,z0],[x0,y1,z1],[x0,0,z1]);if(CAM.x>x1)poly(cs,[x1,0,z0],[x1,y1,z0],[x1,y1,z1],[x1,0,z1]);poly(cf,[x0,0,z0],[x1,0,z0],[x1,y1,z0],[x0,y1,z0])}
 const hh=v=>{const t=Math.sin(v*12.9898)*43758.5453;return t-Math.floor(t)};
-function drawRoom(){const x=ctx,t=R.t,H=HC,px=1/SS,sn=v=>Math.round(v*SS)/SS;x.setTransform(SS,0,0,SS,0,0);x.imageSmoothingEnabled=false;
-  const qb=qz(RZB),bx=RXW*LW*qb,by0=cY(qb),by1=fY(qb);
-  x.fillStyle=ROOM.bg;x.fillRect(0,0,iw,ih);
-  /* on a phone held upright the room is framed closer, so the screen and him fill it */const pz=ih>iw*1.2?1.22:1;if(pz>1)x.setTransform(SS*pz,0,0,SS*pz,SS*CX*(1-pz),SS*(ih*.42-(by0+by1)/2*pz));
-  /* floor, with a grid that runs to the far wall */
-  x.fillStyle=ROOM.floor;x.beginPath();const qn=qz(ZMIN-1);x.moveTo(CX-bx,by1);x.lineTo(CX+bx,by1);x.lineTo(CX+RXW*LW*qn,fY(qn));x.lineTo(CX-RXW*LW*qn,fY(qn));x.fill();
-  x.fillStyle=ROOM.grid;for(let z=Math.ceil(ZMIN);z<RZB;z+=.8){const q=qz(z);x.fillRect(CX-RXW*LW*q,sn(fY(q)),RXW*LW*q*2,px)}
-  for(let k=-2;k<=2;k++){const l=k*RXW/2.5;x.beginPath();x.moveTo(CX+l*LW*qb,by1);x.lineTo(CX+l*LW*qn+px,fY(qn));x.lineTo(CX+l*LW*qn-px,fY(qn));x.fill()}
-  /* the far wall is one screen, showing the hall he was just in */
-  x.fillStyle=ROOM.wall;x.fillRect(CX-bx,by0,bx*2,by1-by0);
-  const sw=bx*2*.94,sh0=(by1-by0)*.86,sxl=CX-sw/2,syt=by0+(by1-by0)*.05;x.fillStyle=INK;x.fillRect(sxl-2,syt-2,sw+4,sh0+4);
+const LEDC=["#3CDC78","#3CDC78","#3CDC78","#F0B43C","#5AA0FF",RED];
+/* blinking lights on a vertical face at x, between z0 and z1 */
+function leds(x,z0,z1,h,seed){const t=R.t;for(let u=0;u<11;u++){const y=.25+u*h/12;for(let c=0;c<4;c++){const r=hh(seed+u*7+c*3),on=hh(r*77+((t*(1+r*5))|0))>(r>.8?.2:.5);if(!on)continue;
+  const z=z0+.15+(c+.5)*(z1-z0-.3)/4,a=PJ(x,y,z),sz=Math.max(1/SS,CAM.F*.045/a[2]);ctx.fillStyle=LEDC[(r*6)|0];ctx.fillRect(a[0]-sz/2,a[1]-sz/2,sz,sz*.8)}}}
+/* tiny arrows: left, right, up, down */
+const ARR=[[4,12,31,12,4],[4,6,31,6,4],[4,14,21,4,4],[4,4,21,14,4]];
+function arrow(c,x,y,s,col){ctx.fillStyle=col;const m=ARR[c];for(let j=0;j<5;j++)for(let i=0;i<5;i++)if(m[j]>>(4-i)&1)ctx.fillRect(x+i*s,y+j*s,s,s)}
+/* a monitor on a desk, facing you; what's on it */
+function monitor(x,z,y0,w,hgt,kind){const a=PJ(x-w/2,y0+hgt,z),b=PJ(x+w/2,y0,z),mx=a[0],my=a[1],mw=b[0]-a[0],mh=b[1]-a[1],px=1/SS,t=R.t;
+  ctx.fillStyle=INK;ctx.fillRect(mx-px*2,my-px*2,mw+px*4,mh+px*4);const st=PJ(x,0,z);ctx.fillRect(st[0]-px,b[1],px*2,Math.max(0,PJ(x,y0,z)[1]-b[1]));ctx.fillStyle="#0B1A12";ctx.fillRect(mx,my,mw,mh);
+  const LOG=G.il,n=LOG.length,rp=R.rep>=0&&!R.know?Math.min(1,R.rep/3.2):1,shown=Math.floor(n*rp),s1=Math.max(px,Math.round(mh/9*SS)/SS),g=t-R.flash<.18?"#E8FFF0":"#3CDC78";
+  if(kind<2){const rows=Math.max(1,Math.floor((mh-s1)/(s1*7))),cols=Math.max(1,Math.floor((mw-s1)/(s1*7))),per=rows*cols,end=kind===0?shown:Math.max(0,shown-per);
+    for(let j=0;j<per;j++){const idx=end-per+j;if(idx<0||idx>=n)continue;arrow(LOG[idx],mx+s1+(j%cols)*s1*7,my+s1+(j/cols|0)*s1*7,s1,idx>=n-1&&t-R.flash<.3?"#E8FFF0":idx>=R.seen?"#9CFFC0":"#2E9E5A")}}
+  else if(kind===2){const v=String(Math.min(n,shown)).padStart(4,"0");text(ctx,v,mx+(mw-tw(v,s1))/2,my+(mh-5*s1)/2,s1,g)}
+  else if(kind===3){ctx.fillStyle="#3CDC78";for(let k=0;k<mw/px/2;k++){const yy=Math.sin(k*.5+t*6)*Math.sin(k*.13+t)*(t-R.flash<.4?1:.35);ctx.fillRect(mx+k*px*2,my+mh/2+yy*mh*.4,px*2,px)}}
+  else{for(let k=0;k<14;k++){ctx.fillStyle=hh(k+((t*12)|0)*.37)<.5?"#24302A":"#3C4A42";ctx.fillRect(mx+hh(k*3.1)*mw*.8,my+hh(k*5.7+((t*12)|0))*mh*.9,mw*.2,px)}}}/* static */
+function drawRoom(){const x=ctx,t=R.t,px=1/SS;x.setTransform(SS,0,0,SS,0,0);x.imageSmoothingEnabled=false;
+  const tall=ih>iw*1.2;CAM.F=tall?iw*1.3:Math.min(iw*.95,ih*1.3);CAM.cy=ih*(tall?.53:.56);CAM.p=tall?.62:.46;CAM.y=tall?6.2:5.2;
+  x.fillStyle=RC.bg;x.fillRect(0,0,iw,ih);
+  /* floor and its grid */
+  poly(RC.floor,[-RMW,0,-12],[RMW,0,-12],[RMW,0,RMD],[-RMW,0,RMD]);x.strokeStyle=RC.grid;x.lineWidth=px;x.beginPath();
+  for(let z=0;z<=RMD;z+=1.25){const a=PJ(-RMW,0,z),b=PJ(RMW,0,z);x.moveTo(a[0],a[1]);x.lineTo(b[0],b[1])}
+  for(let k=-4;k<=4;k++){const a=PJ(k*1.15,0,-2),b=PJ(k*1.15,0,RMD);x.moveTo(a[0],a[1]);x.lineTo(b[0],b[1])}x.stroke();
+  /* the far wall: one screen, showing this room from where you are */
+  poly(RC.wall,[-RMW,0,RMD],[RMW,0,RMD],[RMW,4.4,RMD],[-RMW,4.4,RMD]);
+  const s0=PJ(-3.9,4.05,RMD),s1=PJ(3.9,.85,RMD),sx=s0[0],sy=s0[1],sw=s1[0]-s0[0],sh=s1[1]-s0[1];x.fillStyle=INK;x.fillRect(sx-2*px,sy-2*px,sw+4*px,sh+4*px);x.fillStyle="#0E1A2E";x.fillRect(sx,sy,sw,sh);
   const fl=R.rep>=0&&!R.know?(hh(t*30|0)<.3?.55:1):hh(t*9|0)<.04?.8:1;
-  if(SNAP){const ca=sw/sh0,cw=Math.min(iw,ih*ca),ch=cw/ca,cx0=CX-cw/2,cy0=Math.max(0,Math.min(ih-ch,GY-ch*.8)),k=sw/cw;
-    x.imageSmoothingEnabled=true;x.globalAlpha=fl;x.drawImage(SNAP,cx0*SS,cy0*SS,cw*SS,ch*SS,sxl,syt,sw,sh0);x.globalAlpha=1;
-    /* the runner on the screen, doing what you do */
-    const mjy=R.mj>0?Math.sin(R.mj/.6*Math.PI)*34:0,nm=R.gl>0?"gl":R.ms>0?"slide":R.mj>0?"jump":((t*8)|0)&1?"runA":"runB",mxp=sxl+(CX+R.mx*LW-cx0)*k,myp=syt+(GY-mjy-cy0)*k;
-    x.save();x.beginPath();x.rect(sxl,syt,sw,sh0);x.clip();blit(SP.sh,mxp,syt+(GY+3-cy0)*k,P0*k);blit(SP[nm],mxp,myp,P0*k);
-    x.fillStyle="rgba(14,30,70,.42)";x.fillRect(sxl,syt,sw,sh0);x.fillStyle="rgba(90,150,255,.1)";x.fillRect(sxl,syt,sw,sh0);x.fillStyle="rgba(0,0,0,.22)";for(let y=syt;y<syt+sh0;y+=2)x.fillRect(sxl,y,sw,px*Math.max(1,SS/2));
-    const ry=syt+((t*.25)%1)*sh0;x.fillStyle="rgba(255,255,255,.05)";x.fillRect(sxl,ry,sw,sh0*.06);x.restore()}
-  /* ceiling and its cable trays */
-  x.fillStyle="#0E1114";x.beginPath();x.moveTo(CX-bx,by0);x.lineTo(CX+bx,by0);const qt=Math.min(qn,(HY+2)/(HC-(GY-HY)));x.lineTo(CX+RXW*LW*qt,cY(qt));x.lineTo(CX-RXW*LW*qt,cY(qt));x.fill();
-  x.fillStyle="#1D2227";for(const l of[-1.5,1.5]){x.beginPath();x.moveTo(CX+l*LW*qb-1,by0);x.lineTo(CX+l*LW*qb+1,by0);x.lineTo(CX+l*LW*qt+2,cY(qt));x.lineTo(CX+l*LW*qt-2,cY(qt));x.fill()}
-  /* server racks down both walls, every light doing its own thing */
-  for(const sg of[-1,1]){x.fillStyle=ROOM.wall;rq(sg,ZMIN-1,RZB,0,H*1.02);
-    for(let k=0;k<4;k++){const za=.15+k*1.18,zb=za+1.05;x.fillStyle=ROOM.rack;rq(sg,za,zb,0,H*.62);x.fillStyle=ROOM.face;rq(sg,za+.07,zb-.07,H*.03,H*.6);
-      for(let u=0;u<13;u++){const h1=H*(.05+u*.042);x.fillStyle=ROOM.unit;rq(sg,za+.07,zb-.07,h1,h1+px*1.2);
-        for(let c=0;c<5;c++){const r=hh(k*91+u*7+c*3+sg*.5),rate=1+r*5,on=hh(r*77+((t*rate)|0))>(r>.8?.2:.55);if(!on)continue;
-          x.fillStyle=r<.55?"#3CDC78":r<.75?"#F0B43C":r<.85?"#5AA0FF":RED;const a=za+.18+c*.15+r*.04;rq(sg,a,a+.06,h1+H*.012,h1+H*.022)}}}
-    x.fillStyle="#0B0D10";for(let k=0;k<5;k++){const z=.1+k*1.18;rq(sg,z,z+.05,H*.62,H*1.02)}}
-  /* the desk and its monitors */
-  const qd=qz(RDK),qd2=qz(RDK+.6),dw=RXW*.92,dh=H*.11;
-  x.fillStyle="#262C33";x.beginPath();x.moveTo(CX-dw*LW*qd,fY(qd)-dh*qd);x.lineTo(CX+dw*LW*qd,fY(qd)-dh*qd);x.lineTo(CX+dw*LW*qd2,fY(qd2)-dh*qd2);x.lineTo(CX-dw*LW*qd2,fY(qd2)-dh*qd2);x.fill();
-  x.fillStyle="#1B2025";x.fillRect(CX-dw*LW*qd,fY(qd)-dh*qd,dw*LW*qd*2,dh*qd);x.fillStyle="#30373F";x.fillRect(CX-dw*LW*qd,fY(qd)-dh*qd,dw*LW*qd*2,px*1.5);
-  const zm=RDK+.32,qm=qz(zm),mw=LW*.62*qm,mh=H*.085*qm,my=fY(qm)-dh*qm-mh-H*.012*qm,s1=Math.max(px,Math.round(mh/9*SS)/SS);
-  const LOG=G.il,n=LOG.length,rp=R.rep>=0&&!R.know?Math.min(1,R.rep/3.2):1,shown=Math.floor(n*rp);
-  [-1.55,-.78,.78,1.55].forEach((l,i)=>{const mx=CX+l*LW*qm-mw/2;x.fillStyle=INK;x.fillRect(mx-px*2,my-px*2,mw+px*4,mh+px*4);x.fillRect(CX+l*LW*qm-px*2,my+mh,px*4,H*.012*qm+px);
-    x.fillStyle="#0B1A12";x.fillRect(mx,my,mw,mh);const g=R.t-R.flash<.18?"#E8FFF0":"#3CDC78";
-    if(i<2){/* the inputs, newest at the bottom; at the desk the whole run scrolls past */const rows=Math.max(1,Math.floor((mh-s1)/(s1*7))),cols=Math.max(1,Math.floor((mw-s1)/(s1*7))),per=rows*cols,end=i===0?shown:Math.max(0,shown-per);
-      for(let j=0;j<per;j++){const idx=end-per+j+(i===0?0:0);if(idx<0||idx>=n)continue;const cc=j%cols,rr=j/cols|0;arrow(LOG[idx],mx+s1+cc*s1*7,my+s1+rr*s1*7,s1,idx>=n-1&&R.t-R.flash<.3?"#E8FFF0":idx>=R.seen?"#9CFFC0":"#2E9E5A")}}
-    else if(i===2){const v=String(Math.min(n,shown)).padStart(4,"0");text(x,v,mx+(mw-tw(v,s1))/2,my+(mh-5*s1)/2,s1,g)}
-    else{x.fillStyle="#3CDC78";for(let k2=0;k2<mw/px/2;k2++){const yy=Math.sin(k2*.5+t*6)*Math.sin(k2*.13+t)*(R.t-R.flash<.4?1:.35);x.fillRect(mx+k2*px*2,my+mh/2+yy*mh*.4,px*2,px)}}});
-  x.fillStyle="#2A3036";x.fillRect(CX-LW*.45*qm,fY(qm)-dh*qm-px*2,LW*.9*qm,px*2);/* keyboard */
-  /* the glow of the big screen over the floor and the desk */
-  const gr=x.createLinearGradient(0,by1,0,ih);gr.addColorStop(0,"rgba(120,170,240,.13)");gr.addColorStop(1,"rgba(120,170,240,0)");x.fillStyle=gr;x.fillRect(CX-bx*1.6,by1,bx*3.2,ih-by1);
-  /* him */
-  const q=qz(R.rz),rx=CX+R.rx*LW*q+(R.know&&R.gl<=0&&R.out<0&&hh((t*20)|0)<.12?(hh(t)<.5?-px:px):0),ry=fY(q),moving=Math.abs(R.l-R.rx)>.02||Math.abs((R.out>=0?-1.6:RZR[R.r])-R.rz)>.02;
-  const fr=R.face||R.out>=0,kn=R.know?"k":"n",nm=R.gl>0&&!moving?"gl":fr?(moving?(((R.walk*4.2)|0)&1?"fa"+kn:"fb"+kn):"f0"+kn):moving?(((R.walk*4.2)|0)&1?"runA":"runB"):"idle";
-  blit(SP.sh,rx,ry+P0*q,P0*q);blit(SP[nm],rx,ry-(moving&&((R.walk*4.2|0)&1)?q:0),P0*q);
+  if(FB){x.imageSmoothingEnabled=true;x.globalAlpha=fl;x.drawImage(FB,sx,sy,sw,sh);x.globalAlpha=1;x.imageSmoothingEnabled=false}
+  x.fillStyle="rgba(14,30,70,.35)";x.fillRect(sx,sy,sw,sh);x.fillStyle="rgba(0,0,0,.25)";for(let y=sy;y<sy+sh;y+=2)x.fillRect(sx,y,sw,px*Math.max(1,SS/2));
+  x.fillStyle="rgba(255,255,255,.05)";x.fillRect(sx,sy+((t*.25)%1)*sh,sw,sh*.06);if(((t*1.2)|0)%2){x.fillStyle=RED;x.fillRect(sx+sw*.03,sy+sh*.05,Math.max(px*2,sw*.018),Math.max(px*2,sw*.018))}/* recording */
+  /* side walls, the doorway on the left with the hall's light coming in */
+  poly(RC.wall,[-RMW,0,-12],[-RMW,0,RMD],[-RMW,4.4,RMD],[-RMW,4.4,-12]);poly(RC.wall,[RMW,0,-12],[RMW,0,RMD],[RMW,4.4,RMD],[RMW,4.4,-12]);
+  for(const sg of[-1,1])poly(RC.wtop,[sg*RMW,4.4,-12],[sg*(RMW+.25),4.4,-12],[sg*(RMW+.25),4.4,RMD],[sg*RMW,4.4,RMD]);
+  const dz0=cellZ(0)-.65,dz1=cellZ(0)+.65,dl=R.out>=0?1:.75+.1*Math.sin(t*3);poly(INK,[-RMW,0,dz0-.12],[-RMW,0,dz1+.12],[-RMW,2.5,dz1+.12],[-RMW,2.5,dz0-.12]);
+  poly("#EDEBE4",[-RMW,0,dz0],[-RMW,0,dz1],[-RMW,2.35,dz1],[-RMW,2.35,dz0]);x.globalAlpha=.16*dl;poly("#F7F6F2",[-RMW,0,dz0],[-RMW,0,dz1],[-RMW+2.4,0,dz1+.5],[-RMW+2.4,0,dz0-.5]);x.globalAlpha=1;
+  /* the glow of the big screen over the floor */
+  const gb=PJ(0,0,RMD),gr=x.createLinearGradient(0,gb[1],0,PJ(0,0,RMD-6)[1]);gr.addColorStop(0,"rgba(120,170,240,.16)");gr.addColorStop(1,"rgba(120,170,240,0)");x.fillStyle=gr;poly(gr,[-RMW,0,RMD],[RMW,0,RMD],[RMW,0,RMD-6],[-RMW,0,RMD-6]);
+  /* everything standing in the room, far to near, him among it */
+  const L=[];
+  for(const sg of[-1,1])for(let k=0;k<6;k++){const z0=2+k*1.33,z1=z0+1.25;L.push([z0,()=>{const xi=sg*3.95,xo=sg*RMW;box(Math.min(xi,xo),Math.max(xi,xo),2.7,z0,z1,RC.rack,RC.rside,RC.rtop);
+    poly(RC.rside,[xi,.15,z0+.06],[xi,.15,z1-.06],[xi,2.6,z1-.06],[xi,2.6,z0+.06]);leds(xi,z0,z1,2.3,k*31+sg)}])}
+  for(const sg of[-1,1])for(let r=3;r<=5;r++){const z0=cellZ(r)-.6,z1=z0+1.2,x0=sg*2.3-.35,x1=sg*2.3+.35;L.push([z0,()=>{box(x0,x1,1.8,z0,z1,RC.rtop,RC.rack,RC.rtop);
+    const xs=CAM.x<x0?x0:CAM.x>x1?x1:null;if(xs!==null)leds(xs,z0,z1,1.45,r*13+sg*5);poly(RC.rside,[x0+.05,.1,z0],[x1-.05,.1,z0],[x1-.05,1.7,z0],[x0+.05,1.7,z0])}])}
+  const desk=(x0,x1,z0,z1,h,mons)=>L.push([z0,()=>{box(x0,x1,h,z0,z1,RC.dside,RC.dside,RC.dtop);for(const m of mons)monitor(m[0],(z0+z1)/2,h,m[1],m[2],m[3])}]);
+  desk(-3.1,3.1,cellZ(7)-.5,cellZ(7)+.5,.85,[[-2.2,1,.62,0],[-1.05,1,.62,1],[1.05,1,.62,2],[2.2,1,.62,3]]);/* the big desk */
+  desk(-.55,.55,cellZ(4)-.45,cellZ(4)+.45,.75,[[0,.6,.42,4]]);desk(-.6,.6,cellZ(1)-.45,cellZ(1)+.45,.75,[[-.15,.55,.4,4]]);
+  L.push([R.pz,()=>{const a=PJ(R.px,0,R.pz),s=CAM.F*.092/a[2],moving=Math.abs(cellX(R.cx)-R.px)+Math.abs(cellZ(R.cz)-R.pz)>.02||R.out>=0,
+    kn=R.know?"k":"n",st=((R.walk*4.2)|0)&1,nm=R.gl>0&&!moving?"gl":R.face?(moving?(st?"fa"+kn:"fb"+kn):"f0"+kn):moving?(st?"runA":"runB"):"idle",
+    j=R.know&&!moving&&R.gl<=0&&hh((t*20)|0)<.12?(hh(t)<.5?-px:px):0,b=R.bump>0?Math.sin(R.bump*60)*px:0;
+    blit(SP.sh,a[0],a[1]+s,s);if(R.out>=0)x.globalAlpha=Math.max(0,1-R.out);blit(SP[nm],a[0]+j+b,a[1]-(moving&&st?s*.5:0),s);x.globalAlpha=1}]);
+  L.sort((a,b)=>b[0]-a[0]);for(const o of L)o[1]();
   /* one line, only if you leave him standing there */
-  if(R.wait&&R.out<0&&((t*1.6)|0)%2===0){const s=Math.max(1,Math.round(sw/120*SS)/SS),m="WAITING FOR INPUT",w=tw(m,s);x.fillStyle="rgba(0,0,0,.55)";x.fillRect(CX-w/2-s*3,syt+sh0*.42-s*3,w+s*6+s*4,s*11);text(x,m,CX-w/2,syt+sh0*.42,s,"#E8F0FF");x.fillStyle="#E8F0FF";x.fillRect(CX+w/2+s*2,syt+sh0*.42,s*3,s*5)}
+  if(R.wait&&R.out<0&&((t*1.6)|0)%2===0){const s=Math.max(1,Math.round(sw/120*SS)/SS),m="WAITING FOR INPUT",w=tw(m,s),ty=sy+sh*.4;x.fillStyle="rgba(0,0,0,.6)";x.fillRect(CX-w/2-s*3,ty-s*3,w+s*10,s*11);text(x,m,CX-w/2,ty,s,"#E8F0FF");x.fillStyle="#E8F0FF";x.fillRect(CX+w/2+s*2,ty,s*3,s*5)}
+  x.setTransform(1,0,0,1,0,0);
+  /* what the camera sees goes up on the big screen, a frame later */
+  if(!FB)FB=mk(Math.ceil(gc.width/3),Math.ceil(gc.height/3));const fc=FB.getContext("2d");fc.imageSmoothingEnabled=true;fc.drawImage(gc,0,0,FB.width,FB.height);
   /* in and out through the dark */
-  const fa=R.out>=0?Math.min(1,R.out/.85):Math.max(0,1-R.t/.9);if(fa>0){x.setTransform(1,0,0,1,0,0);x.fillStyle="rgba(5,6,8,"+fa+")";x.fillRect(0,0,gc.width,gc.height)}
-  x.setTransform(1,0,0,1,0,0)}
+  const fa=R.out>=0?Math.min(1,Math.max(0,R.out-.3)/.7):Math.max(0,1-R.t/.7);if(fa>0){x.fillStyle="rgba(5,6,8,"+fa+")";x.fillRect(0,0,gc.width,gc.height)}}
 /* on the title screen, once you've been in: now and then he looks back at you, and can't quite keep still */
 const titleGl=(e)=>{if(!ROOMSEEN||G.state!=="title")return false;const p=performance.now()/1000%9;return p>5.6+(e||0)&&p<7.4-(e||0)};
 /* ---------- loop: draws every frame while running, otherwise only when something changes ---------- */
@@ -1005,7 +1007,7 @@ function act(a){if(busy)return;if(HT.open){HT.open=0;dirty=true;return}if(a==="h
   if(G.state==="room")return roomAct(a);
   if(G.state==="title"){if(a==="go"||a==="up")start();return}
   if(G.state==="over"){if(G.ph==="name"){if(a==="go")namePress();else if(a==="left")nameMove(-1,0);else if(a==="right")nameMove(1,0);else if(a==="up")nameMove(0,-1);else if(a==="down")nameMove(0,1);return}
-    if((a==="go"||a==="up")&&G.hitT>.6){if(G.ph==="card"&&LB.on&&lbQual(G.score)&&!G.auto)lbNext();else start()}return}
+    if((a==="go"||a==="up")&&G.hitT>.6){if(G.ph==="card"&&LB.on)lbNext();else if(G.hitT>1.3)start()}return}/* the card always goes to the board first, so a stray tap never throws a score away */
   if(G.state==="pause"){if(a==="go"||a==="up"||a==="pause"){G.state="run";sfx("resume");dirty=true}return}
   if(a==="pause"){G.state="pause";sfx("pause");dirty=true}
   else if(a==="left"){if(G.il)G.il.push(0);if(G.lane>-1){G.lane--;sfx("lane",-1)}else if(doorNear())enterRoom()}
@@ -1014,9 +1016,9 @@ function act(a){if(busy)return;if(HT.open){HT.open=0;dirty=true;return}if(a==="h
   else if(a==="down"){if(G.il)G.il.push(3);if(G.jy>0){G.vy=-FALL_V;G.sbuf=1}else{if(!(G.slide>0)){G.sq=-.35;sfx("slide");burst()}G.slide=SLIDE_T;G.sl0=G.t;G.jbuf=0}}}
 const KEYS={ArrowLeft:"left",KeyA:"left",ArrowRight:"right",KeyD:"right",ArrowUp:"up",KeyW:"up",Space:"go",Enter:"go",ArrowDown:"down",KeyS:"down",Escape:"close",KeyP:"pause",KeyM:"sound",KeyC:"share",KeyH:"help",KeyI:"invite"};
 function onKey(e){if(G.state==="over"&&G.ph==="name"&&!busy&&nameKey(e)){e.preventDefault();e.stopPropagation();return}if(HT.open&&!e.repeat){e.preventDefault();e.stopPropagation();HT.open=0;dirty=true;return}const a=KEYS[e.code]||(e.key==="Escape"?"close":null);e.stopPropagation();if(a||e.key==="Tab")e.preventDefault();if(!a||(e.repeat&&a!=="close"))return;act(a)}
-function onDown(e){if(e.target.closest&&e.target.closest("button"))return;p0={x:e.clientX,y:e.clientY,done:false,home:HB.live};e.preventDefault()}
+function onDown(e){if(e.target.closest&&e.target.closest("button"))return;p0={x:e.clientX,y:e.clientY,done:false,home:HB.live,st:G.state};e.preventDefault()}
 function onMove(e){if(!p0||p0.done)return;const dx=e.clientX-p0.x,dy=e.clientY-p0.y;if(Math.max(Math.abs(dx),Math.abs(dy))<24)return;p0.done=true;act(Math.abs(dx)>Math.abs(dy)?(dx<0?"left":"right"):(dy<0?"up":"down"))}
-function onUp(){if(p0&&!p0.done){if(HT.open){HT.open=0;dirty=true}else if(G.state==="title"&&!busy&&p0.home&&homeTap(p0.x,p0.y)){}else if(G.state==="over"&&G.ph==="name"&&!busy)nameTap(p0.x,p0.y);else if(!(G.state==="over"&&G.ph==="board"&&!busy&&shareTap(p0.x,p0.y)))act("go")}p0=null}
+function onUp(){if(p0&&p0.st==="run"&&G.state==="over"){p0=null;return}/* a finger already down when he crashed is not a tap */if(p0&&!p0.done){if(HT.open){HT.open=0;dirty=true}else if(G.state==="title"&&!busy&&p0.home&&homeTap(p0.x,p0.y)){}else if(G.state==="over"&&G.ph==="name"&&!busy)nameTap(p0.x,p0.y);else if(!(G.state==="over"&&G.ph==="board"&&!busy&&shareTap(p0.x,p0.y)))act("go")}p0=null}
 const stop=e=>e.preventDefault();
 function onBlur(){if(G.state==="run"){G.state="pause";dirty=true}}
 function onVis(){if(document.hidden)onBlur()}
