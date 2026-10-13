@@ -5,9 +5,9 @@
 (()=>{"use strict";
 if(window.VKAudio)return;
 
-let C=null,OUT,LIM,SFX,MUS,DK,MF,tw=0,AMB,AF,HUM,REV,RET,NB,DH,amb=null,wind=null,drone=null,timer=0,OFF=false;
+let C=null,OUT,LIM,SFX,MUS,DK,MF,tw=0,AMB,AF,HUM,REV,RET,NB,DH,wind=null,drone=null,OFF=false;
 const S={state:"",zone:0,vox:false,sp:0,x:0,mult:1,slo:0,boost:false,night:0,door:0};
-const mtof=m=>440*Math.pow(2,(m-69)/12),R=(a,b)=>a+Math.random()*(b-a),pick=a=>a[Math.random()*a.length|0];
+const mtof=m=>440*Math.pow(2,(m-69)/12),R=(a,b)=>a+Math.random()*(b-a);
 
 /* ---------- the mix ---------- */
 function build(ctx){C=ctx;
@@ -24,7 +24,7 @@ function build(ctx){C=ctx;
 function impulse(sec,decay){const sr=C.sampleRate,n=sr*sec|0,b=C.createBuffer(2,n,sr);
   for(let ch=0;ch<2;ch++){const d=b.getChannelData(ch);let lp=0;for(let i=0;i<n;i++){const t=i/n;lp+=((Math.random()*2-1)-lp)*(.35+.6*(1-t));d[i]=lp*Math.pow(1-t,decay)*Math.min(1,i/(sr*.008))}}return b}
 function startLoops(t){
-  amb=C.createBufferSource();amb.buffer=NB;amb.loop=true;amb.connect(AF);amb.start(t);
+  const amb=C.createBufferSource();amb.buffer=NB;amb.loop=true;amb.connect(AF);amb.start(t);
   for(const f of[50,100,150]){const o=C.createOscillator(),g=C.createGain();o.frequency.value=f;g.gain.value=f===50?1:f===100?.5:.2;o.connect(g);g.connect(HUM);o.start(t)}
   /* the hum behind the door in the mailroom: mains and a faint whine, nearly nothing until you're beside it */
   for(const[f,v]of[[120,1],[240,.55],[360,.25],[2960,.04]]){const o=C.createOscillator(),g=C.createGain();o.frequency.value=f;g.gain.value=v;o.connect(g);g.connect(DH);o.start(t)}}
@@ -145,7 +145,7 @@ const P={
     duck(t,.62,.1);
     if(S.vox){tone(f,t,.45,{v:.05,rv:.45,pos,pt});tone(f*2,t,.18,{v:.014,rv:.4,pos,pt});tone(f*3,t,.05,{v:.006})}
     else{tone(f,t,.22,{v:.055,rv:.08,pos,pt});tone(f*2,t,.07,{v:.012,pos,pt});noise(t,.008,{ft:"highpass",f:7000,v:.02,pos,pt})}},
-  trail:m=>{const t=now(),ch=chordNow();duck(t,.55,.25);[0,1,2,3].forEach(j=>mallet(mtof(ch.n[j]+24),t+j*.045,.08,{pan:(j-1.5)*.25,rv:.25}));noise(t+.18,.6,{ft:"highpass",f:7000,v:.05,rv:.3})},
+  trail:()=>{const t=now(),ch=chordNow();duck(t,.55,.25);[0,1,2,3].forEach(j=>mallet(mtof(ch.n[j]+24),t+j*.045,.08,{pan:(j-1.5)*.25,rv:.25}));noise(t+.18,.6,{ft:"highpass",f:7000,v:.05,rv:.3})},
   near:s=>{const t=now(),o={pos:[s*1.5,.2,-3.5],pos1:[s*1.5,.2,3],pt:t,pd:.3};noise(t,.2,{f:2600,f1:600,q:1.1,a:.13,v:.4,...o});tone(200,t,.16,{f1:110,a:.12,v:.07,...o})},/* it rushes past your ear, front to behind */
   hit:()=>{const t=now();tone(105,t,.65,{f1:32,v:.5});noise(t,.28,{ft:"lowpass",f:4500,f1:700,v:.38});noise(t,.06,{ft:"highpass",f:2000,v:.2});paper(t+.03,8,.07);tapeStop(t)},
   smash:()=>{const t=now();noise(t,.14,{ft:"lowpass",f:3500,f1:900,v:.36,pos:[0,0,-1.5],pos1:[0,.5,2],pt:t,pd:.2});tone(230,t,.1,{f1:120,v:.14});paper(t,6,.09)},
@@ -225,7 +225,7 @@ function tick(s){if(!C||OFF)return;const t=C.currentTime,prev=S.state,pz=S.zone,
 
 /* ---------- plumbing ---------- */
 function ensure(){if(C)return true;const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return false;let c;try{c=new AC({latencyHint:"interactive"})}catch(e){try{c=new AC()}catch(e2){return false}}build(c)
-  startLoops(C.currentTime);timer=setInterval(()=>{if(C.state==="running")sched(.15)},25);return true}
+  startLoops(C.currentTime);setInterval(()=>{if(C.state==="running")sched(.15)},25);return true}
 window.VKAudio={
   play(n,a){if(!ensure()||C.state!=="running")return;try{P[n]&&P[n](a)}catch(e){}},
   tick,
