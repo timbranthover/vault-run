@@ -9,7 +9,7 @@
     "build": "next build",
     "start": "next start",
     "serve": "node tests/server.mjs",
-    "test": "node tests/check.mjs && node tests/smoke.mjs && RUNS=4 node tests/fair.mjs"
+    "test": "node tests/check.mjs && node tests/frame-cap.mjs && node tests/frame-cap-browser.mjs && node tests/smoke.mjs && RUNS=4 node tests/fair.mjs"
   },
   "dependencies": {
     "@vercel/blob": "2.8.0",
