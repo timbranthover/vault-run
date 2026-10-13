@@ -519,41 +519,32 @@ function start(){LB.me=null;SHAT=null;if(LB.passOk){LB.pass="";seenSet();cards.t
   while(G.next<=0){row(SPAWN+G.next);G.next+=gap()}sfx("start");dirty=true}
 const gap=()=>Math.max(8,G.speed*.6)+Math.random()*6;
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
-/* ---------- set pieces: short, deliberately timed sequences, a few for each room ----------
-   Each string is one row of the hallway, read left lane / middle / right, one row per beat (about two-thirds of a second).
+/* ---------- room signatures: now and then, a short run of two or three rows that belongs to the room you're in ----------
+   Most of the hall stays random. These just give each room a feel of its own, and are never easier than a random row:
+   every row has at least two things in it. Read left lane / middle / right, one row per beat.
    C = something tall to go round   J = something low to jump   S = something hanging to slide under   . = clear
-   k = a row of keys in a clear lane   j / s = keys over a jump / under a slide: the harder line pays more
-   Every set piece ends with a clear row to breathe. tests/fair.mjs checks that each one can always be got through
-   moving at most one lane per beat. Tier 0 from the start, 1 once you're under way, 2 from the second lap. */
+   k = keys in a clear lane   j / s = keys over a jump / under a slide
+   tests/fair.mjs checks each can always be got through moving one lane per beat, and that the hall is no sparser than
+   pure random. Tier 0 from the start, tier 1 past 900 m or from the second lap. */
 const SETS=[
-  /* MAILROOM: open, readable, teaches clean lane changes */
-  [[0,"weave",["CCk","CkC","kCC"]],[0,"weave back",["kCC","CkC","CCk"]],[0,"carts",["J.J",".k.","JJJ"]],
-   [1,"sorting",["C.C","CJC","C.C","CSC"]],[1,"the long way",["C.j","C.j","Ck."]],[1,"sacks",["S.S",".S.","SkS"]],
-   [2,"rush hour",["CC.","CJC",".CC","CSC","CC."]]],
+  /* MAILROOM: weaving between cabinets and carts */
+  [[0,"weave",["CCk","CkC","kCC"]],[0,"weave back",["kCC","CkC","CCk"]],[0,"carts",["JJC","CJJ"]],[1,"sorting",["C.C","CJC","CSC"]]],
   /* ARCHIVE: jump and slide in rhythm */
-  [[0,"hurdle and duck",["JJJ","...","SSS"]],[0,"shelving",[".J.","SkS",".J."]],
-   [1,"one-two",["JJJ","SSS"]],[1,"stacks",["CSC","CJC","CSC"]],[1,"the paper trail",["s.C","s.C","s.."]],
-   [2,"filing frenzy",["JJJ","SSS","JJJ","...","SSS"]],[2,"aisle",["CJC","CSC","CJC","CSC"]]],
-  /* LOBBY: long sightlines, columns of clocks, read far ahead */
-  [[0,"colonnade",["C.C","CkC","C.C"]],[0,"velvet ropes",["JJ.",".JJ","J.J"]],
-   [1,"the gallery",["C.C","CJC","C.C","CSC","CkC"]],[1,"concierge",["C..",".C.","..C",".C.","C.."]],[1,"chandeliers",["SSS","...","SjS"]],
-   [2,"grand staircase",["CC.","CCJ","CCS","C.C","JCC"]]],
-  /* VAULT: short and hard, then relief and gold */
-  [[0,"bars",["JJJ","...","kkk"]],[1,"lasers",["CJS","...","SCJ","...","kkk"]],[1,"shutters",["SSS","JJJ","...","k.k"]],
-   [2,"the gauntlet",["CJS","SCJ","JSC","...","kkk"]],[2,"lockdown",["CCJ","CCS","CJC","JCC","SCC","k.k"]]],
+  [[0,"hurdle and duck",["JJJ","SSS"]],[0,"shelving",["CJC","SkS"]],[1,"stacks",["CSC","CJC","CSC"]],[1,"paper trail",["sJC","sJC"]]],
+  /* LOBBY: columns and ropes, read ahead */
+  [[0,"colonnade",["C.C","CJC",".CC"]],[0,"velvet ropes",["JJ.",".JJ","J.J"]],[1,"concierge",["CC.","C.C",".CC"]],[1,"chandeliers",["SSS","SjS"]]],
+  /* VAULT: short and sharp */
+  [[0,"bars",["JJJ","CkC"]],[1,"lasers",["CJS","SCJ"]],[1,"gauntlet",["CJS","SCJ","JSC"]],[1,"lockdown",["CCJ","CJC","JCC"]]],
   /* THE WOODS: fallen trees and a slalom through the pines */
-  [[0,"deadfall",["JJJ","...","SSS"]],[0,"pines",["C.C",".C.","C.C"]],[1,"thicket",["CJC","CSC","CkC"]],[2,"windfall",["JJJ","SSS","JJJ","SSS"]]]];
-const setChance=()=>G.dist<160?0:G.lap?.62:G.dist<700?.32:.5;
-function setPiece(Zi){const tier=G.lap?2:G.dist>900?1:0,pool=SETS[Zi].filter(e=>e[0]<=tier);if(!pool.length)return null;
-  /* never the same set piece twice in a row */let e;for(let i=0;i<4;i++){e=pool[Math.random()*pool.length|0];if(e[1]!==G.pn)break}G.pn=e[1];return e[2].concat(["..."])}
+  [[0,"deadfall",["JJJ","SSS"]],[0,"pines",["CC.","C.C",".CC"]],[1,"thicket",["CJC","CSC"]],[1,"windfall",["JJJ","SSS","JJJ"]]]];
+const setChance=()=>G.noSets||G.dist<160?0:G.lap?.11:G.dist<900?.07:.09;/* a signature starts on about 1 row in 12, so roughly 1 row in 6 is part of one */
+function setPiece(Zi){const tier=G.lap||G.dist>900?1:0,pool=SETS[Zi].filter(e=>e[0]<=tier);if(!pool.length)return null;
+  /* never the same one twice in a row */let e;for(let i=0;i<4;i++){e=pool[Math.random()*pool.length|0];if(e[1]!==G.pn)break}G.pn=e[1];return e[2].slice()}
 function placeRow(r,z,Zi){
   for(let i=0;i<3;i++){const c=r[i],L=i-1;if(c===".")continue;
     if(c==="k"||c==="j"||c==="s"){const id=++G.trI;G.trs[id]={got:0,broken:false};for(let k=0;k<5;k++)G.objs.push({t:"key",lane:L,z:z-1+k*1.5,tr:id});if(c==="k")continue}
     const t=c==="C"?"cab":c==="J"||c==="j"?"stack":"sign";
-    G.objs.push({t,v:t==="cab"?(Math.random()<PCAB[Zi]?"cab":Zi===4&&Math.random()<.5?"pine":VAR[Zi][0]):VAR[Zi][t==="stack"?1:2],lane:L,z})}
-  /* power-ups still turn up, in a clear lane of a set piece's breathing row */
-  const free=[-1,0,1].filter((L,i)=>r[i]===".");
-  if(free.length===3&&G.dist>G.nextPU&&!G.objs.some(o=>o.t==="pu")){const L=free[Math.random()*3|0],k=pickPU();if(k==="vox")voxQueue();G.objs.push({t:"pu",k,lane:L,z});G.nextPU=G.dist+rr(220,360)}}
+    G.objs.push({t,v:t==="cab"?(Math.random()<PCAB[Zi]?"cab":Zi===4&&Math.random()<.5?"pine":VAR[Zi][0]):VAR[Zi][t==="stack"?1:2],lane:L,z})}}
 function row(z){const A=G.dist+z,ga=A-Math.round(A/ZL)*ZL;if(A>ZL/2&&A<BRK+20&&ga>-6&&ga<10)return;/* nothing in or just behind a doorway */
   if(A>BRK-14&&A<BRK+75){if(A>BRK+12&&Math.random()<.7){const L=[-1,0,1][Math.random()*3|0],id=++G.trI;G.trs[id]={got:0,broken:false};for(let i=0;i<5;i++)G.objs.push({t:"key",lane:L,z:z-1+i*1.5,tr:id})}return}/* the way out is clear: just keys to follow */
   const Zi=zoneOf(A);

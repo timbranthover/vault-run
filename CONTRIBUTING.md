@@ -24,8 +24,8 @@ npm run serve      # play at http://localhost:8787/run
 npm test           # must pass
 ```
 
-Set pieces (hand-made runs of obstacles) live in `SETS` in `public/game.js`. `tests/fair.mjs` checks every one can be
-got through moving at most one lane per beat, and has a fair autopilot (no cheating) play whole runs.
+Room signatures (short hand-made runs of two or three rows) live in `SETS` in `public/game.js`. `tests/fair.mjs` checks each can be
+got through moving one lane per beat, that the hall is never sparser than pure random, and has a fair autopilot play whole runs.
 
 Open a pull request with a sentence on what changed and, for anything visual,
 a screenshot or short clip. Checks run automatically on every pull request.
