@@ -47,6 +47,16 @@ Add `?fps` to the address to see the frame rate.
 
 Ideas and fixes are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
+### Codex and Claude review workflow
+
+Codex works as a contributor under Claude's review. For Codex changes:
+
+1. Work on a separate branch and keep the change focused.
+2. Run `npm test`, then open a pull request describing the change and test results.
+3. Leave the pull request unmerged for Claude to review and approve.
+4. Address review feedback on the same branch. Do not push directly to `main`,
+   merge, or deploy without Claude's approval.
+
 ## License
 
 [MIT](LICENSE)
