@@ -405,6 +405,54 @@ function passCheck(){if(!LB.on||!LB.top.length)return;
 /* ---------- a handful of moments per visit, counted by the site's analytics if the page loaded it (run.html and the challenge page do) ---------- */
 function track(n,d){try{if(window.va)window.va("event",d?{name:n,data:d}:{name:n})}catch(e){}}
 let RUNS=0;
+/* Frame-cap hint: timing is evidence of a cap, never proof of a battery setting.
+   Only a light title/results screen can establish the hint; play can clear it.
+   Raw RAF intervals (not the physics clamp), four-second windows, and a warm-up
+   keep loading, tab switches and isolated stalls out of the decision. */
+function frameCapMonitor(enabled){
+  let last=0,warm=0,elapsed=0,count=0,near=0,fast=0,context="",capped=false,dismissed=false;
+  const clear=()=>{elapsed=count=near=fast=0};
+  const reset=()=>{last=0;warm=0;context="";capped=false;clear()};
+  return{reset,dismiss(){dismissed=true;capped=false},get show(){return enabled&&capped&&!dismissed},
+    sample(t,mode,visible){
+      if(!enabled||dismissed)return;
+      if(!visible||!mode){reset();return}
+      if(!last||context!==mode){last=t;context=mode;warm=0;clear();return}
+      const ms=t-last;last=t;
+      if(ms<=0||ms>100){warm=0;capped=false;clear();return}
+      if(warm<1500){warm+=ms;return}
+      elapsed+=ms;count++;if(ms>=28&&ms<=38)near++;if(ms<22)fast++;
+      if(elapsed<4000)return;
+      if(fast/count>=.85)capped=false;
+      else if(mode==="idle")capped=count>=100&&near/count>=.9&&elapsed/count>=31&&elapsed/count<=35;
+      clear();
+    }}
+}
+const CAP=frameCapMonitor(/iPhone/i.test(navigator.userAgent));
+let powerNote=null;
+function powerHint(){
+  if(!powerNote)return;
+  /* A footer needs breathing room; omit it on short/landscape screens and
+     while the help, initials keyboard, room, or active run needs the space. */
+  const visible=CAP.show&&!document.hidden&&document.hasFocus()&&innerHeight>=720&&innerHeight>innerWidth&&innerWidth>=300&&!HT.open&&
+    (G.state==="title"||(G.state==="over"&&G.ph!=="name"&&G.hitT>.6));
+  if(powerNote.hidden===visible)powerNote.hidden=!visible;
+}
+function makePowerHint(){
+  if(!/iPhone/i.test(navigator.userAgent))return;
+  powerNote=document.createElement("aside");powerNote.className="vkg-power";powerNote.hidden=true;
+  const copy=document.createElement("div");copy.setAttribute("role","status");copy.setAttribute("aria-label","For smoother play, try turning Low Power Mode off.");
+  const c=mk(520,88),x=c.getContext("2d");c.setAttribute("aria-hidden","true");
+  text(x,"FOR SMOOTHER PLAY",0,8,4,MUTE);
+  text(x,"TRY TURNING LOW POWER MODE OFF",0,40,4,INK);
+  copy.append(c);
+  const dismiss=document.createElement("button");dismiss.type="button";dismiss.setAttribute("aria-label","Dismiss performance tip");dismiss.innerHTML=XSVG;
+  dismiss.onclick=e=>{e.stopPropagation();CAP.dismiss();powerHint();root.focus({preventScroll:true})};
+  /* Interacting with the footer must never start/retry a run. */
+  for(const n of["pointerdown","pointerup","pointermove","click"])powerNote.addEventListener(n,e=>e.stopPropagation());
+  dismiss.addEventListener("keydown",e=>e.stopPropagation());
+  powerNote.append(copy,dismiss);root.append(powerNote);
+}
 /* frame pacing: add ?fps to the page address to see it live; once a visit, after ten seconds of running, the typical rate is counted */
 const FPSM=/[?&]fps\b/.test(location.search),FT=[],FA=[];let FPS1=0;
 function fpsNote(dt){FT.push(dt);if(FT.length>60)FT.shift();if(FPS1)return;FA.push(dt);
@@ -987,7 +1035,7 @@ function drawRoom(){const x=ctx,t=R.t,H=HC,px=1/SS,sn=v=>Math.round(v*SS)/SS;x.s
 /* on the title screen, once you've been in: now and then he looks back at you, and can't quite keep still */
 const titleGl=(e)=>{if(!ROOMSEEN||G.state!=="title")return false;const p=performance.now()/1000%9;return p>5.6+(e||0)&&p<7.4-(e||0)};
 /* ---------- loop: draws every frame while running, otherwise only when something changes ---------- */
-function frame(t){raf=requestAnimationFrame(frame);if(VQ.length&&G.state==="run")voxStep(2);if(G.state==="run"&&G.zone!==4&&G.dist>BRK-600)wprep(false,false);
+function frame(t){raf=requestAnimationFrame(frame);CAP.sample(t,G.state==="title"||G.state==="over"?"idle":G.state==="run"?"run":"",!document.hidden&&document.hasFocus());powerHint();if(VQ.length&&G.state==="run")voxStep(2);if(G.state==="run"&&G.zone!==4&&G.dist>BRK-600)wprep(false,false);
   if(G.state==="title"&&(WSEEN&&performance.now()/1000%11<5.1||titleGl(-.1)||tPhase().p<1||TB.msg&&performance.now()-TB.t<2700))dirty=true;const dt=last?Math.min(.05,(t-last)/1000):0;last=t;if(G.state==="run"&&dt>0)fpsNote(dt);
   G.boilT+=dt;if(G.boilT>=BOIL){G.boilT%=BOIL;G.boil=(G.boil+1)%3;dirty=true}
   if(G.state==="room"){roomUpdate(dt);dirty=true}
@@ -1013,13 +1061,13 @@ function act(a){if(busy)return;if(HT.open){HT.open=0;dirty=true;return}if(a==="h
   else if(a==="up"||a==="go"){if(G.il)G.il.push(2);G.jbuf=.14}
   else if(a==="down"){if(G.il)G.il.push(3);if(G.jy>0){G.vy=-FALL_V;G.sbuf=1}else{if(!(G.slide>0)){G.sq=-.35;sfx("slide");burst()}G.slide=SLIDE_T;G.sl0=G.t;G.jbuf=0}}}
 const KEYS={ArrowLeft:"left",KeyA:"left",ArrowRight:"right",KeyD:"right",ArrowUp:"up",KeyW:"up",Space:"go",Enter:"go",ArrowDown:"down",KeyS:"down",Escape:"close",KeyP:"pause",KeyM:"sound",KeyC:"share",KeyH:"help",KeyI:"invite"};
-function onKey(e){if(G.state==="over"&&G.ph==="name"&&!busy&&nameKey(e)){e.preventDefault();e.stopPropagation();return}if(HT.open&&!e.repeat){e.preventDefault();e.stopPropagation();HT.open=0;dirty=true;return}const a=KEYS[e.code]||(e.key==="Escape"?"close":null);e.stopPropagation();if(a||e.key==="Tab")e.preventDefault();if(!a||(e.repeat&&a!=="close"))return;act(a)}
+function onKey(e){if(powerNote&&powerNote.contains(e.target))return;if(G.state==="over"&&G.ph==="name"&&!busy&&nameKey(e)){e.preventDefault();e.stopPropagation();return}if(HT.open&&!e.repeat){e.preventDefault();e.stopPropagation();HT.open=0;dirty=true;return}const a=KEYS[e.code]||(e.key==="Escape"?"close":null);e.stopPropagation();if(a||e.key==="Tab")e.preventDefault();if(!a||(e.repeat&&a!=="close"))return;act(a)}
 function onDown(e){if(e.target.closest&&e.target.closest("button"))return;p0={x:e.clientX,y:e.clientY,done:false,home:HB.live};e.preventDefault()}
 function onMove(e){if(!p0||p0.done)return;const dx=e.clientX-p0.x,dy=e.clientY-p0.y;if(Math.max(Math.abs(dx),Math.abs(dy))<24)return;p0.done=true;act(Math.abs(dx)>Math.abs(dy)?(dx<0?"left":"right"):(dy<0?"up":"down"))}
 function onUp(){if(p0&&!p0.done){if(HT.open){HT.open=0;dirty=true}else if(G.state==="title"&&!busy&&p0.home&&homeTap(p0.x,p0.y)){}else if(G.state==="over"&&G.ph==="name"&&!busy)nameTap(p0.x,p0.y);else if(!(G.state==="over"&&G.ph==="board"&&!busy&&shareTap(p0.x,p0.y)))act("go")}p0=null}
 const stop=e=>e.preventDefault();
-function onBlur(){if(G.state==="run"){G.state="pause";dirty=true}}
-function onVis(){if(document.hidden)onBlur()}
+function onBlur(){CAP.reset();powerHint();if(G.state==="run"){G.state="pause";dirty=true}}
+function onVis(){CAP.reset();powerHint();if(document.hidden)onBlur()}
 function onResize(){clearTimeout(rzT);rzT=setTimeout(()=>{if(root&&!busy)size()},120)}
 function listen(on){const f=on?"addEventListener":"removeEventListener";
   window[f]("keydown",onKey,true);window[f]("resize",onResize);window[f]("blur",onBlur);document[f]("visibilitychange",onVis);
@@ -1029,6 +1077,10 @@ function listen(on){const f=on?"addEventListener":"removeEventListener";
 /* ---------- open and close: the screen breaks into blocks between app and game ---------- */
 const CSS=`.vkg{position:fixed;inset:0;z-index:90;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;outline:0}
 .vkg canvas{position:absolute;left:0;top:0;image-rendering:crisp-edges;image-rendering:pixelated}
+.vkg-power{position:absolute;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(310px,calc(100% - 40px));box-sizing:border-box;border-top:1px solid ${LINE};background:${PAPER};padding:10px 0 3px;display:flex;align-items:center;justify-content:space-between;gap:6px}
+.vkg-power[hidden]{display:none}.vkg-power div{min-width:0;flex:1}.vkg-power canvas{position:static;display:block;width:100%;height:auto}
+.vkg-power button{flex:0 0 44px;height:44px;border:0;background:transparent;display:grid;place-items:center;cursor:pointer;color:${MUTE};padding:0}
+.vkg-power button svg{opacity:.55}.vkg-power button:focus-visible{outline:2px solid ${MUTE};outline-offset:-4px}
 .vkg-c{visibility:hidden}.vkg.on .vkg-c{visibility:visible}.vkg-d{display:none;pointer-events:none}
 .vkg-x{position:absolute;top:calc(12px + env(safe-area-inset-top,0px));right:12px;width:44px;height:44px;border:2px solid ${INK};border-radius:4px;background:#fff;box-shadow:3px 3px 0 ${LINE};display:grid;place-items:center;cursor:pointer;padding:0;visibility:hidden}
 html.vkg-lock{overflow:hidden!important;scrollbar-gutter:auto!important}
@@ -1054,12 +1106,12 @@ function open(){if(root||busy)return;busy=true;prevFocus=document.activeElement;
   btn=document.createElement("button");btn.type="button";btn.className="vkg-x";btn.setAttribute("aria-label","Close the game");btn.innerHTML=XSVG;btn.onclick=()=>act("close");
   sbtn=document.createElement("button");sbtn.type="button";sbtn.className="vkg-x vkg-s";sbtn.title="Sound (M)";sbtn.onclick=()=>{act("sound");root.focus({preventScroll:true})};paintSound();
   XS=null;/* standalone: the X goes home, and hides on the home screen (see homeX) */
-  root.append(gc,dc,sbtn,btn);document.body.appendChild(root);
+  root.append(gc,dc,sbtn,btn);document.body.appendChild(root);makePowerHint();CAP.reset();
   G.state="title";G.ph="card";G.tt=performance.now();G.tHold=0;lbFetch();G.objs.length=0;G.dist=0;G.lane=0;G.x=0;G.jy=0;G.slide=0;G.cam=0;G.sq=0;G.freeze=0;G.mag=G.boost=G.shield=G.grace=G.vox=G.vtr=G.slo=0;G.fxT=9;G.zone=0;G.zf=9;POP.length=0;size();draw();listen(true);if(SND){loadAudio();const A=AU();if(A){A.unlock();sfx("open")}}
   if(REDUCED)return shown();
   dc.style.display="block";blocks(cells(),300,c=>dctx.drawImage(gc,c[0],c[1],CELL*SS,CELL*SS,c[0],c[1],CELL*SS,CELL*SS),shown)}
 function close(){if(!root||busy)return;busy=true;cancelAnimationFrame(raf);raf=0;sfx("close");
-  const done=()=>{document.documentElement.classList.remove("vkg-lock");listen(false);root.remove();root=gc=ctx=dc=dctx=btn=sbtn=null;if(window.VKAudio)setTimeout(()=>{if(!root)VKAudio.suspend()},450);BG=[];cards={};G.objs.length=0;G.state="title";HT.open=0;p0=null;busy=false;
+  const done=()=>{document.documentElement.classList.remove("vkg-lock");listen(false);root.remove();root=gc=ctx=dc=dctx=btn=sbtn=powerNote=null;CAP.reset();if(window.VKAudio)setTimeout(()=>{if(!root)VKAudio.suspend()},450);BG=[];cards={};G.objs.length=0;G.state="title";HT.open=0;p0=null;busy=false;
     if(prevFocus&&prevFocus.isConnected&&prevFocus.focus)prevFocus.focus({preventScroll:true});prevFocus=null};
   if(REDUCED)return done();
   dctx.clearRect(0,0,dc.width,dc.height);dctx.drawImage(gc,0,0);dc.style.display="block";root.classList.remove("on");document.documentElement.classList.remove("vkg-lock");
